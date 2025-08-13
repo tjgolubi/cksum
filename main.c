@@ -28,8 +28,8 @@ int main(int argc, const char* argv[]) {
       printf("%s: cksum_fp failed\n", argv[i]);
       return EXIT_FAILURE;
     }
-    output_crc(argv[i], false, &crc_result, false, false, '\n', true,
-               file_length);
+
+    printf("%u %ju %s\n", crc_result, file_length, argv[i]);
     fclose(fp);
   }
   return EXIT_SUCCESS;

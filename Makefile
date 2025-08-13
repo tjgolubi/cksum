@@ -15,8 +15,8 @@ CKSUM_E=cksum.$E
 TARGET1=$(CKSUM_E)
 TARGETS=$(TARGET1)
 
-SRC1:=main.c cksum.c crctab.c cksum_vmull.c
-#SRC1:=main.c cksum.c crctab.c cksum_pclmul.c
+SRC1:=main.c cksum.c crctab.c cksum_slice8.c cksum_vmull.c
+#SRC1:=main.c cksum.c crctab.c cksum_slice8.c cksum_pclmul.c
 SOURCE:=$(SRC1)
 
 #SYSINCL:=$(addsuffix /include, $(UNITS)/core $(UNITS)/systems $(GSL))

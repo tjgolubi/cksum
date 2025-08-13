@@ -9,14 +9,6 @@
 
 extern bool cksum_debug;
 
-extern int crc_sum_stream(FILE *stream, void *resstream, uintmax_t *length);
-
-extern
-bool cksum_vmull(FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out);
-
-extern
-bool cksum_pclmul(FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out);
-
-extern uint_fast32_t const crctab[8][256];
+extern int crc_sum_stream(FILE *stream, unsigned *result, uintmax_t *length);
 
 #endif

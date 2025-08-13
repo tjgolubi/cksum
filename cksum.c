@@ -13,11 +13,17 @@
 #include <stdio.h>
 
 /* Number of bytes to read at once.  */
-# define BUFLEN (1 << 16)
+#define BUFLEN (1 << 16)
 
 typedef bool (*cksum_fp_t) (FILE *, uint_fast32_t *, uintmax_t *);
 
 extern uint_fast32_t const crctab[8][256];
+
+extern
+bool cksum_vmull(FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out);
+
+extern
+bool cksum_pclmul(FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out);
 
 static cksum_fp_t pclmul_supported(void) {
 #if USE_PCLMUL_CRC32
@@ -101,7 +107,7 @@ bool cksum_slice8(FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out) {
 /* Calculate the checksum and length in bytes of stream STREAM.
    Return -1 on error, 0 on success.  */
 
-int crc_sum_stream(FILE *stream, void *resstream, uintmax_t *length) {
+int crc_sum_stream(FILE *stream, unsigned* result, uintmax_t *length) {
   uintmax_t total_bytes = 0;
   uint_fast32_t crc = 0;
 
@@ -122,8 +128,7 @@ int crc_sum_stream(FILE *stream, void *resstream, uintmax_t *length) {
     crc = (crc << 8) ^ crctab[0][((crc >> 24) ^ total_bytes) & 0xff];
   crc = ~crc & 0xffffffff;
 
-  unsigned int crc_out = crc;
-  memcpy(resstream, &crc_out, sizeof crc_out);
+  *result = (unsigned) crc;
 
   return 0;
 } // crc_sum_stream

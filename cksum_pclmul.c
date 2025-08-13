@@ -10,6 +10,8 @@
 /* Number of bytes to read at once.  */
 #define BUFLEN (1 << 16)
 
+extern uint_fast32_t const crctab[8][256];
+
 /* Calculate CRC32 using PCLMULQDQ CPU instruction found in x86/x64 CPUs */
 
 bool cksum_pclmul(FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out) {
@@ -31,8 +33,8 @@ bool cksum_pclmul(FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out) {
   four_mult_constant   = _mm_set_epi64x(0x8833794c, 0xe6228b11);
 
   /* Constant to byteswap a full SSE register */
-  shuffle_constant = _mm_set_epi8( 0,  1,  2,  3,  4,  5,  6,  7,  8,
-      9, 10, 11, 12, 13, 14, 15);
+  shuffle_constant = _mm_set_epi8(
+                          0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 
   while ((bytes_read = fread(buf, 1, BUFLEN, fp)) > 0) {
     __m128i *datap;

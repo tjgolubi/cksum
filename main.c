@@ -1,4 +1,3 @@
-#include "config.h"
 #include "cksum.h"
 
 #include <stdio.h>
@@ -6,10 +5,6 @@
 #include <stdlib.h>
 
 bool cksum_debug = true;
-
-#undef fopen
-#undef perror
-#undef fclose
 
 int main(int argc, const char* argv[]) {
   if (argc < 2) {

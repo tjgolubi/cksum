@@ -15,8 +15,16 @@ CKSUM_E=cksum.$E
 TARGET1=$(CKSUM_E)
 TARGETS=$(TARGET1)
 
-SRC1:=main.c cksum.c crctab.c cksum_vmull.c
-#SRC1:=main.c cksum.c crctab.c cksum_pclmul.c
+SRC1:=main.c cksum.c crctab.c cksum_slice8.c
+ifeq ($(COMPILER), gcc)
+CDEFS+=-DUSE_PCLMUL_CRC32=1
+SRC1+=cksum_pclmul.c
+endif
+ifeq ($(COMPILER), clang)
+CDEFS+=-DUSE_VMULL_CRC32=1
+SRC1+=cksum_vmull.c
+endif
+
 SOURCE:=$(SRC1)
 
 #SYSINCL:=$(addsuffix /include, $(UNITS)/core $(UNITS)/systems $(GSL))
@@ -27,8 +35,6 @@ INCLUDE:=$(PROJDIR)
 LIBS=
 
 #DEBUG=1
-
-CDEFS+=-DUSE_VMULL_CRC32=1
 
 include $(SWDEV)/$(COMPILER).mk
 include $(SWDEV)/build.mk

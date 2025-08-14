@@ -1,5 +1,6 @@
 #include "cksum.h"
 
+#include <string.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -23,13 +24,13 @@ int main(int argc, const char* argv[]) {
     }
     unsigned int crc_result = 0;
     uintmax_t file_length = 0;
-    int status = crc_sum_stream(fp, &crc_result, &file_length);
-    if (status != 0) {
+    bool status = crc_sum_stream(fp, &crc_result, &file_length);
+    if (!status) {
       printf("%s: cksum_fp failed\n", argv[i]);
       return EXIT_FAILURE;
     }
-    output_crc(argv[i], false, &crc_result, false, false, '\n', true,
-               file_length);
+
+    printf("%u %ju %s\n", crc_result, file_length, argv[i]);
     fclose(fp);
   }
   return EXIT_SUCCESS;

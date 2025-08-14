@@ -28,7 +28,7 @@ uint_fast32_t cksum_vmull(uint_fast32_t crc, void* buf, size_t* bufsize) {
   const poly64x2_t four_mult_constant   = vcombine_p64(vcreate_p64(0xe6228b11),
                                                        vcreate_p64(0x8833794c));
 
-  uint64x2_t* datap = (uint64x2_t *) buf;
+  uint64x2_t* datap = (uint64x2_t*) buf;
 
   uint64x2_t data;
   uint64x2_t data2;
@@ -153,6 +153,6 @@ uint_fast32_t cksum_vmull(uint_fast32_t crc, void* buf, size_t* bufsize) {
     vst1q_u64((uint64_t *) (datap), data);
   }
 
-  *bufsize = *bufsize % 16 + 16;
+  *bufsize = *bufsize % sizeof(uint64x2_t) + num * sizeof(uint64x2_t);
   return crc;
 } // cksum_vmull

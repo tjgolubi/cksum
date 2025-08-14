@@ -23,8 +23,8 @@ int main(int argc, const char* argv[]) {
     }
     unsigned int crc_result = 0;
     uintmax_t file_length = 0;
-    int status = crc_sum_stream(fp, &crc_result, &file_length);
-    if (status != 0) {
+    bool status = crc_sum_stream(fp, &crc_result, &file_length);
+    if (!status) {
       printf("%s: cksum_fp failed\n", argv[i]);
       return EXIT_FAILURE;
     }

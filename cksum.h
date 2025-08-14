@@ -9,6 +9,6 @@
 
 extern bool cksum_debug;
 
-extern int crc_sum_stream(FILE *stream, unsigned *result, uintmax_t *length);
+extern bool crc_sum_stream(FILE *stream, unsigned *result, uintmax_t *length);
 
 #endif

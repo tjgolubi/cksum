@@ -9,23 +9,27 @@
 #include <sys/auxv.h>
 #include <asm/hwcap.h>
 
+#include <arm_neon.h>
+
 #include <stdio.h>
 
 /* Number of bytes to read at once.  */
 #define BUFLEN (1 << 16)
 
-typedef bool (*cksum_fp_t) (FILE *, uint_fast32_t *, uintmax_t *);
+typedef unsigned __int128 uint128_t;
+
+typedef uint_fast32_t (*cksum_fp_t) (uint_fast32_t, void* buf, size_t* bufsize);
 
 extern uint_fast32_t const crctab[8][256];
 
 extern
-bool cksum_slice8(FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out);
+uint_fast32_t cksum_slice8(uint_fast32_t crc, void* buf, size_t* bufsize);
 
 extern
-bool cksum_vmull(FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out);
+uint_fast32_t cksum_vmull(uint_fast32_t crc, void* buf, size_t* bufsize);
 
 extern
-bool cksum_pclmul(FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out);
+uint_fast32_t cksum_pclmul(uint_fast32_t crc, void* buf, size_t* bufsize);
 
 static cksum_fp_t pclmul_supported(void) {
 #if USE_PCLMUL_CRC32
@@ -56,11 +60,13 @@ static cksum_fp_t vmull_supported(void) {
 } // vmull_supported
 
 /* Calculate the checksum and length in bytes of stream STREAM.
-   Return -1 on error, 0 on success.  */
+   Return false on error, true on success.  */
 
-int crc_sum_stream(FILE *stream, unsigned* result, uintmax_t *length) {
+bool crc_sum_stream(FILE *stream, unsigned* result, uintmax_t *length) {
   uintmax_t total_bytes = 0;
   uint_fast32_t crc = 0;
+  size_t bytes_read = 0;
+  uint128_t buf[BUFLEN / sizeof(uint128_t)];
 
   static cksum_fp_t cksum_fp;
   if (!cksum_fp)
@@ -70,8 +76,23 @@ int crc_sum_stream(FILE *stream, unsigned* result, uintmax_t *length) {
   if (!cksum_fp)
     cksum_fp = cksum_slice8;
 
-  if (!cksum_fp(stream, &crc, &total_bytes))
-    return -1;
+  while ((bytes_read = fread(buf, 1, BUFLEN, stream)) > 0) {
+    if (total_bytes + bytes_read < total_bytes) {
+      errno = EOVERFLOW;
+      return false;
+    }
+    total_bytes += bytes_read;
+    size_t len = bytes_read;
+    crc = cksum_fp(crc, buf, &len);
+    char* cp = (char*) buf + (bytes_read-len);
+    while (len--)
+      crc = (crc << 8) ^ crctab[0][((crc >> 24) ^ *cp++) & 0xff];
+    if (feof(stream))
+      break;
+  }
+
+  if (ferror(stream))
+    return false;
 
   *length = total_bytes;
 
@@ -81,5 +102,5 @@ int crc_sum_stream(FILE *stream, unsigned* result, uintmax_t *length) {
 
   *result = (unsigned) crc;
 
-  return 0;
+  return true;
 } // crc_sum_stream

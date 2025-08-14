@@ -21,7 +21,7 @@ uint_fast32_t cksum_pclmul(uint_fast32_t crc, void* buf, size_t* bufsize) {
   const __m128i shuffle_constant = _mm_set_epi8(
                           0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 
-  num = *bufsize / sizeof(__m128i);
+  size_t num = *bufsize / sizeof(__m128i);
   __m128i* datap = (__m128i*) buf;
 
   __m128i data;
@@ -124,6 +124,6 @@ uint_fast32_t cksum_pclmul(uint_fast32_t crc, void* buf, size_t* bufsize) {
     _mm_storeu_si128(datap, data);
   }
 
-  *bufsize = *bufsize % sizeof(uint128_t) + num * sizeof(uint128_t);
+  *bufsize = *bufsize % sizeof(__m128i) + num * sizeof(__m128i);
   return crc;
 } // cksum_pclmul

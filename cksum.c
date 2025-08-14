@@ -6,10 +6,11 @@
 #include <sys/types.h>
 #include <errno.h>
 
+#if USE_VMULL_CRC32
 #include <sys/auxv.h>
-#include <asm/hwcap.h>
-
-#include <arm_neon.h>
+//#include <asm/hwcap.h>
+//#include <arm_neon.h>
+#endif
 
 #include <stdio.h>
 

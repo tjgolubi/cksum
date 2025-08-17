@@ -1,6 +1,6 @@
-#include "cksum.h"
+#include "cksum.hpp"
 
-uint_fast32_t const crctab[8][256] = {
+const uint_fast32_t CrcTab[8][256] = {
 {
   0x00000000,
   0x04c11db7, 0x09823b6e, 0x0d4326d9, 0x130476dc, 0x17c56b6b,
@@ -433,4 +433,4 @@ uint_fast32_t const crctab[8][256] = {
   0xe84dd390, 0xb3ec0f5a, 0xe1c4d9a5, 0xba65056f, 0x56876031,
   0x0d26bcfb, 0x8b82b73a, 0xd0236bf0, 0x3cc10eae, 0x6760d264
 },
-};
+}; // CrcTab

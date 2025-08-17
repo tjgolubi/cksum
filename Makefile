@@ -15,14 +15,14 @@ CKSUM_E=cksum.$E
 TARGET1=$(CKSUM_E)
 TARGETS=$(TARGET1)
 
-SRC1:=main.c cksum.c crctab.c cksum_slice8.c
+SRC1:=main.cpp cksum.cpp crctab.cpp cksum_slice8.cpp
 ifeq ($(COMPILER), gcc)
 CDEFS+=-DUSE_PCLMUL_CRC32=1
-SRC1+=cksum_pclmul.c
+SRC1+=cksum_pclmul.cpp
 endif
 ifeq ($(COMPILER), clang)
 CDEFS+=-DUSE_VMULL_CRC32=1
-SRC1+=cksum_vmull.c
+SRC1+=cksum_vmull.cpp
 endif
 
 SOURCE:=$(SRC1)
@@ -41,9 +41,13 @@ include $(SWDEV)/build.mk
 
 .ONESHELL:
 
-.PHONY: all clean scour install uninstall
+.PHONY: all clean scour test
 
 all: depend $(TARGETS)
+
+test: all
+	./cksum.exe bigfile.bin
+	cat cksum.txt
 
 $(TARGET1): $(OBJ1) $(LIBS)
         $(LINK)

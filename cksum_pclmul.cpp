@@ -1,15 +1,16 @@
 /* cksum -- calculate and print POSIX checksums and sizes of files
    Copyright (C) 2021-2025 Free Software Foundation, Inc. */
 
-#include "cksum.h"
+#include "cksum.hpp"
 
-#include <stdio.h>
 #include <sys/types.h>
 #include <x86intrin.h>
 
 /* Calculate CRC32 using PCLMULQDQ CPU instruction found in x86/x64 CPUs */
 
-uint_fast32_t cksum_pclmul(uint_fast32_t crc, void* buf, size_t* bufsize) {
+uint_fast32_t cksum_pclmul(uint_fast32_t crc, void* buf, std::size_t* bufsize)
+  noexcept
+{
 
   /* These constants and general algorithms are taken from the Intel whitepaper
      "Fast CRC Computation for Generic Polynomials Using PCLMULQDQ Instruction"
@@ -21,7 +22,7 @@ uint_fast32_t cksum_pclmul(uint_fast32_t crc, void* buf, size_t* bufsize) {
   const __m128i shuffle_constant = _mm_set_epi8(
                           0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 
-  size_t num = *bufsize / sizeof(__m128i);
+  auto num = *bufsize / sizeof(__m128i);
   __m128i* datap = (__m128i*) buf;
 
   __m128i data;

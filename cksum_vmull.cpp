@@ -3,7 +3,7 @@
 
 #include "cksum.hpp"
 #include "Neon.hpp"
-#include "Uint.hpp"
+#include "Int.hpp"
 
 #include <array>
 
@@ -18,6 +18,10 @@
 uint_fast32_t cksum_vmull(uint_fast32_t crc, void* buf, size_t* bufsize)
   noexcept
 {
+  using U128 = tjg::BigUint<uint128_t>;
+  static_assert(sizeof(U128)  == sizeof(uint128_t));
+  static_assert(alignof(U128) == alignof(uint128_t));
+
   auto num = *bufsize / sizeof(uint128_t);
 
   using NeonVec  = NeonV<uint64x2_t>;
@@ -33,7 +37,7 @@ uint_fast32_t cksum_vmull(uint_fast32_t crc, void* buf, size_t* bufsize)
   static const NeonPoly SingleK{SingleK_Init};
   static const NeonPoly FourK  {FourK_Init};
 
-  auto datap = static_cast<Uint<uint128_t, std::endian::big>*>(buf);
+  auto datap = static_cast<U128*>(buf);
 
   NeonVec data0;
   NeonVec data1;
@@ -91,7 +95,7 @@ uint_fast32_t cksum_vmull(uint_fast32_t crc, void* buf, size_t* bufsize)
     return 0;
   }
   else if (num == 1) {
-    datap[0] = datap[0].value() ^ (uint128_t{crc} << (32+64));
+    datap[0] ^= uint128_t{crc} << (32+64);
     *bufsize = *bufsize % sizeof(uint128_t) + sizeof(uint128_t);
     return 0;
   }

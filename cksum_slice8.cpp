@@ -1,41 +1,36 @@
-/* cksum -- calculate and print POSIX checksums and sizes of files
-   Copyright (C) 1992-2025 Free Software Foundation, Inc. */
-
+#include "CrcUpdate.hpp"
 #include "cksum.hpp"
+#include <cstdint>
 
-#include <bit>
-#include <sys/types.h>
-
-#if defined(__GNUC__) || defined(__clang__)
-constexpr std::uint32_t ToBigEndian(std::uint32_t x) {
-  if constexpr (std::endian::native == std::endian::big)
-    return x;
-  else
-    return __builtin_bswap32(x);
-} // ToBigEndian
-#endif
-
-uint_fast32_t cksum_slice8(uint_fast32_t crc,
-                           void* buf, std::size_t* buflen) noexcept
+std::uint32_t
+do_cksum_slice8(std::uint32_t crc, const std::uint64_t* buf, std::size_t num)
+  noexcept
 {
-  /* Process multiples of 8 bytes */
-  auto datap = static_cast<const uint32_t*>(buf);
-  auto num  = *buflen / 8;
-  while (num >= 1) {
-    std::uint32_t first  = *datap++;
-    std::uint32_t second = *datap++;
-    crc   ^= ToBigEndian(first);
-    second = ToBigEndian(second);
-    crc = CrcTab[7][(   crc >> 24) & 0xff]
-        ^ CrcTab[6][(   crc >> 16) & 0xff]
-        ^ CrcTab[5][(   crc >>  8) & 0xff]
-        ^ CrcTab[4][(   crc >>  0) & 0xff]
-        ^ CrcTab[3][(second >> 24) & 0xff]
-        ^ CrcTab[2][(second >> 16) & 0xff]
-        ^ CrcTab[1][(second >>  8) & 0xff]
-        ^ CrcTab[0][(second >>  0) & 0xff];
-    --num;
+  using std::uint8_t;
+  auto p = reinterpret_cast<const std::uint32_t*>(buf);
+  while (num--) {
+    crc ^= *p++;
+    auto hi = *p++;
+    crc = CrcTab[7][uint8_t(crc >>  0)]
+        ^ CrcTab[6][uint8_t(crc >>  8)]
+        ^ CrcTab[5][uint8_t(crc >> 16)]
+        ^ CrcTab[4][uint8_t(crc >> 24)]
+        ^ CrcTab[3][uint8_t(hi  >>  0)]
+        ^ CrcTab[2][uint8_t(hi  >>  8)]
+        ^ CrcTab[1][uint8_t(hi  >> 16)]
+        ^ CrcTab[0][uint8_t(hi  >> 24)];
   }
-  *buflen = *buflen % 8 + 8 * num;
   return crc;
+} // do_cksum_slice8
+
+std::uint32_t cksum_slice8(std::uint32_t crc, const void* buf, std::size_t size)
+  noexcept
+{
+  auto n = size / sizeof(std::uint64_t);
+  auto r = size % sizeof(std::uint64_t);
+  auto p = reinterpret_cast<const std::uint64_t*>(buf);
+  crc = std::byteswap(crc);
+  crc = do_cksum_slice8(crc, p, n);
+  crc =  CrcUpdate(crc, p+n, r);
+  return std::byteswap(crc);
 } // cksum_slice8

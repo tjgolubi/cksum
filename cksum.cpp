@@ -1,11 +1,7 @@
-/* cksum -- calculate and print POSIX checksums and sizes of files
-   Copyright (C) 1992-2025 Free Software Foundation, Inc. */
-
+#include "CrcUpdate.hpp"
 #include "cksum.hpp"
 
 #include <iostream>
-
-//#include <sys/types.h>
 
 #if USE_VMULL_CRC32
 #include <sys/auxv.h>
@@ -14,7 +10,8 @@
 /* Number of bytes to read at once.  */
 constexpr std::size_t BufLen = 1 << 16;
 
-typedef uint_fast32_t (*cksum_fp_t) (uint_fast32_t, void* buf, size_t* bufsize);
+using cksum_fp_t =
+            std::uint32_t (*)(std::uint32_t, const void* buf, std::size_t size);
 
 static cksum_fp_t pclmul_supported(void) {
 #if USE_PCLMUL_CRC32
@@ -60,8 +57,9 @@ std::uint32_t CrcSumStream(std::ifstream& stream, std::streamsize* length) {
   if (!cksum_fp)
     cksum_fp = cksum_slice8;
 
-  auto crc = uint_fast32_t{0};
+  auto crc = std::uint32_t{0};
   auto total_bytes = std::streamsize{0};
+  using uint128_t = unsigned __int128;
   auto buf = std::array<uint128_t, BufLen/sizeof(uint128_t)>{};
   auto cbuf = reinterpret_cast<char*>(buf.data());
 
@@ -75,18 +73,14 @@ std::uint32_t CrcSumStream(std::ifstream& stream, std::streamsize* length) {
       throw std::overflow_error{"Failure reading input stream"};
     total_bytes += bytes_read;
     auto len = static_cast<std::size_t>(bytes_read);
-    crc = cksum_fp(crc, buf.data(), &len);
-    auto cp = cbuf + (bytes_read-len);
-    while (len--)
-      crc = (crc << 8) ^ CrcTab[0][((crc >> 24) ^ *cp++) & 0xff];
+    crc = cksum_fp(crc, buf.data(), len);
   } while (!stream.eof());
 
   if (length)
     *length = total_bytes;
 
+  crc = std::byteswap(crc);
   for ( ; total_bytes; total_bytes >>= 8)
-    crc = (crc << 8) ^ CrcTab[0][((crc >> 24) ^ total_bytes) & 0xff];
-  crc = ~crc & 0xffffffff;
-
-  return crc;
+    crc = CrcUpdate(crc, std::byte(total_bytes));
+  return ~std::byteswap(crc);
 } // CrcSumStream

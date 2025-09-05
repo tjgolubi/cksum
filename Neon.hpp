@@ -9,6 +9,9 @@
 #include <concepts>
 #include <type_traits>
 #include <initializer_list>
+#include <exception>
+#include <string>
+#include <utility>
 
 #include <arm_neon.h>
 
@@ -139,9 +142,8 @@ constexpr T FullSwap(T r) noexcept {
 
 namespace tjg {
 
-constexpr uint128_t clmul(std::uint64_t x, std::uint64_t y) noexcept{
-  return __builtin_neon_vmull_p64(x, y);
-}
+constexpr uint128_t clmul(std::uint64_t x, std::uint64_t y) noexcept
+  { return __builtin_neon_vmull_p64(x, y); }
 
 } // tjg
 
@@ -150,295 +152,278 @@ constexpr uint128_t clmul(std::uint64_t x, std::uint64_t y) noexcept{
 // std::byteswap(), i.e. letting tjg::Int do it.
 template<NeonRegister Reg>
 struct NeonV {
-  // Assume that Neon is little-endian (a bird told me).
-  static constexpr auto Endian = std::endian::little;
   using register_type = Reg;
-  using native_type = ScalarT<register_type>;
-  using element_type = tjg::Int<native_type, Endian>;
-  static constexpr std::size_t N = sizeof(register_type) / sizeof(native_type);
-  static constexpr std::size_t size() noexcept { return N; }
-  using value_type = std::array<element_type, N>;
+  using native_type  = NeonTraits<Reg>::scalar_type;
+  static constexpr std::size_t Lanes = NeonTraits<Reg>::Lanes;
+  static constexpr std::size_t size() noexcept { return Lanes; }
+  using full_type  = std::conditional_t<(sizeof(Reg) == 16),
+                                        uint128_t, std::uint64_t>;
 
-  template<std::endian E>
-  using Native = tjg::Int<native_type, E>;
+  register_type r = register_type{};
 
-  template<std::endian E>
-  using NativeSpan = std::span<Native<E>, N>;
-
-  template<std::endian E>
-  using ConstNativeSpan = std::span<const Native<E>, N>;
-
-  template<std::endian E>
-  using NativeArray = std::array<Native<E>, N>;
-
-  template<std::endian E>
-  using ConstNativeArray = std::array<const Native<E>, N>;
-
-  using U8 = tjg::Int<std::uint8_t>;
-
-  template<std::endian E>
-  using U64 = tjg::Int<std::uint64_t, E>;
-
-  template<std::endian E>
-  using U128 = tjg::Int<uint128_t, E>;
-
-  register_type r;
-
-  template<NeonRegister R, std::endian Rep>
-  static constexpr R Load(
-            std::span<const tjg::Int<ScalarT<R>, Rep>, LanesV<R>> src) noexcept
-  {
-    auto p = reinterpret_cast<const ScalarT<R>*>(src.data());
-    R tmp;
-    if constexpr (sizeof(R) == 16)
-      tmp = __builtin_neon_vld1q_v(p, CodeV<R>);
-    else
-      tmp = __builtin_neon_vld1_v(p, CodeV<R>);
-    if (Rep != Endian)
-      tmp = ByteSwap(tmp);
-    return tmp;
-  }
-
-  template<NeonRegister R, std::endian Rep>
-  static constexpr void Store(
-              std::span<tjg::Int<ScalarT<R>, Rep>, LanesV<R>> dst, R x) noexcept
-  {
-    auto p = reinterpret_cast<ScalarT<R>*>(dst.data());
-    if (Rep != Endian)
-      x = ByteSwap(x);
-    if constexpr (sizeof(r) == 16)
-      __builtin_neon_vst1q_v(p, x, CodeV<R>);
-    else
-      __builtin_neon_vst1_v(p, x, CodeV<R>);
-  }
-
-  template<std::endian Rep>
-  constexpr void load(ConstNativeSpan<Rep> src) noexcept
-    { r = Load<register_type>(src); }
-
-  template<std::endian Rep>
-  constexpr void store(NativeSpan<Rep> dst) noexcept
-    { Store(dst, r); }
-
+public:
   constexpr void set(register_type value_) noexcept { r = value_; }
+  constexpr void set(NeonV x) noexcept { set(x.r); }
 
-  template<std::endian Rep>
-  requires (sizeof(register_type) == sizeof(std::uint64_t))
-  constexpr void set(U64<Rep> lo) noexcept
-    { r = static_cast<register_type>(Load<uint64x1_t>(std::span{&lo, 1})); }
+  constexpr void set(full_type x) noexcept { r = (register_type) x ; }
 
-  template<std::endian Rep>
-  constexpr void set(U64<Rep> lo, U64<Rep> hi = U64<Rep>{}) noexcept
-    requires (sizeof(register_type) == sizeof(uint128_t))
-  {
-    uint64x2_t tmp;
-    tmp[0] = lo.raw();
-    tmp[1] = hi.raw();
-    if constexpr (Rep != Endian)
-      tmp = ByteSwap(tmp);
-    r = static_cast<register_type>(tmp);
+  template<std::integral U, std::endian E>
+  requires tjg::NonNarrowing<U, full_type>
+  constexpr void set(tjg::Int<U, E> x) noexcept {
+    r = (register_type) x.raw();
+    if constexpr (E != std::endian::native)
+      r = FullSwap(r);
   }
-
-  template<std::endian Rep>
-  requires (sizeof(register_type) == sizeof(uint128_t))
-  constexpr void set(U128<Rep> x) noexcept {
-    auto p = reinterpret_cast<const U8*>(&x);
-    auto tmp = Load<uint8x16_t>(
-                  std::span<const U8, sizeof(uint128_t)>{p, sizeof(uint128_t)});
-    if constexpr (Rep != Endian)
-      tmp = FullSwap(tmp);
-    r = static_cast<register_type>(tmp);
-  }
-
-  template<std::endian Rep>
-  constexpr void set(ConstNativeSpan<Rep> src) noexcept { load(src); }
-
-  constexpr NeonV& operator=(const NeonV& x) noexcept { set(x.r); return *this; }
 
   constexpr NeonV& operator=(register_type x) noexcept { set(x); return *this; }
+  constexpr NeonV& operator=(const NeonV& x) noexcept { set(x.r); return *this; }
 
-  template<std::endian Rep>
-  requires (sizeof(register_type) == sizeof(std::uint64_t))
-  constexpr NeonV& operator=(U64<Rep> lo) noexcept
-    { set(lo); return *this; }
-
-  template<std::endian Rep>
-  requires (sizeof(register_type) == sizeof(uint128_t))
-  constexpr NeonV& operator=(U128<Rep> x) noexcept
+  template<std::integral U, std::endian E>
+  requires tjg::NonNarrowing<U, full_type>
+  constexpr NeonV& operator=(tjg::Int<U, E> x) noexcept
     { set(x); return *this; }
-
-  template<std::endian Rep>
-  constexpr NeonV& operator=(ConstNativeSpan<Rep> src)
-    noexcept
-    { set(src); return *this; }
 
   constexpr NeonV() noexcept : r{} { }
   constexpr explicit NeonV(register_type value_) noexcept : r{value_} { }
+  constexpr explicit NeonV(full_type v) noexcept { set(v); }
 
-  template<std::endian Rep>
-  requires (sizeof(register_type) == sizeof(std::uint64_t))
-  constexpr explicit NeonV(U64<Rep> lo) noexcept
-    { set(lo); }
-
-  template<std::endian Rep>
-  requires (sizeof(register_type) == 2 * sizeof(std::uint64_t))
-  constexpr explicit NeonV(U64<Rep> lo, U64<Rep> hi=0) noexcept
-    { set(lo, hi); }
-
-  template<std::endian Rep>
-  requires (sizeof(register_type) == sizeof(uint128_t))
-  constexpr explicit NeonV(U128<Rep> x) noexcept { set(x); }
-
-  template<std::endian Rep>
-  constexpr explicit NeonV(ConstNativeSpan<Rep> src) noexcept
-    { set(src); }
-
-  constexpr value_type get() const noexcept {
-    value_type rval;
-    store(rval);
-    return rval;
+private:
+  //----------------------------------------------------------
+  // _set span of values
+  //----------------------------------------------------------
+  template<std::integral V>
+  constexpr void _set(std::span<const V, Lanes> values) noexcept {
+    [&]<int... Is>(std::integer_sequence<int, Is...>) {
+      ((r[Is] = static_cast<native_type>(values[Is])), ...);
+    }(std::make_integer_sequence<int, static_cast<int>(Lanes)>{});
   }
 
-  template<std::endian Rep>
-  requires (sizeof(register_type) == sizeof(uint128_t))
-  constexpr void get(U128<Rep>* result) const noexcept {
-    static constexpr auto Size = sizeof(register_type);
-    auto p = reinterpret_cast<U8*>(result);
-    if constexpr (Rep == Endian) {
-      Store<uint8x16_t>(std::span<U8, Size>{p, Size}, r);
-    } else {
-      auto tmp = static_cast<uint8x16_t>(FullSwap(r));
-      Store<uint8x16_t>(std::span<U8, Size>{p, Size}, tmp);
-    }
+  //----------------------------------------------------------
+  // _set span of tjg::Int's
+  //----------------------------------------------------------
+  template<std::integral V, std::endian E>
+  constexpr void _setInt(std::span<const tjg::Int<V, E>, Lanes> values) noexcept
+  {
+    [&]<int... Is>(std::integer_sequence<int, Is...>) {
+      ((r[Is] = static_cast<native_type>(values[Is].raw())), ...);
+    }(std::make_integer_sequence<int, static_cast<int>(Lanes)>{});
+    if constexpr (E != std::endian::native)
+      r = ByteSwap(r);
   }
 
-  template<std::endian Rep>
-  requires (sizeof(register_type) == sizeof(uint128_t))
-  constexpr operator U128<Rep>() const noexcept
-    { U128<Rep> x; get(&x); return x; }
+public:
+  //----------------------------------------------------------
+  // set(...) overloads — native lane-like
+  //----------------------------------------------------------
+  template<std::integral V, std::size_t M>
+  requires (M == static_cast<std::size_t>(Lanes)
+    && tjg::NonNarrowing<V, native_type>)
+  constexpr void set(std::span<const V, M> values) noexcept { _set(values); }
 
-  template<std::endian Rep>
-  requires (sizeof(register_type) == sizeof(std::uint64_t))
-  constexpr U64<Rep>& get(U64<Rep>* result) const noexcept {
-    static constexpr auto Size = sizeof(register_type);
-    auto p = reinterpret_cast<U8*>(result);
-    if constexpr (Rep == Endian) {
-      Store<uint8x8_t>(std::span<U8, Size>{p, Size}, r);
-    } else {
-      auto tmp = static_cast<uint8x16_t>(FullSwap(r));
-      Store<uint8x8_t>(std::span<U8, Size>{p, Size}, tmp);
-    }
+  template<std::integral V>
+  requires tjg::NonNarrowing<V, native_type>
+  constexpr void set(std::span<const V> values) noexcept {
+    if (values.size() != static_cast<std::size_t>(Lanes))
+      throw std::out_of_range{"NeonV::set: span size != Lanes"};
+    _set(std::span<const V, Lanes>{values.data(), Lanes});
   }
 
-  template<std::endian Rep>
-  requires (sizeof(register_type) == sizeof(std::uint64_t))
-  constexpr operator U64<Rep>() const noexcept
-    { U64<Rep> x; get(&x); return x; }
+  template<class... Args>
+  requires (sizeof...(Args) == Lanes
+    && (tjg::NonNarrowing<Args, native_type> && ...))
+  constexpr void set(Args&&... args) noexcept {
+    const native_type tmp[Lanes]
+                    { static_cast<native_type>(std::forward<Args>(args))...  };
+    _set(std::span<const native_type, Lanes>{tmp, Lanes});
+  }
 
-  constexpr element_type get(int idx) const noexcept
-    { return element_type{r[idx]}; }
+  // initializer_list (native), runtime size check
+  template<typename V>
+  requires tjg::NonNarrowing<V, native_type>
+  constexpr void set(std::initializer_list<V> ilist) {
+    if (ilist.size() != static_cast<std::size_t>(Lanes))
+      throw std::out_of_range{"NeonV::set: initializer_list size != Lanes"};
+    _set(std::span<const V, Lanes>{ilist.begin(), Lanes});
+  }
 
-  template<std::endian Rep>
-  constexpr void set(int idx, Native<Rep> x) noexcept
-    { r[idx] = x.little(); };
+  //----------------------------------------------------------
+  // set(...) overloads — tjg::Int<U, E> sources
+  //----------------------------------------------------------
+  template<typename U, std::endian E, std::size_t M>
+  requires (M == static_cast<std::size_t>(Lanes)
+    && tjg::NonNarrowing<U, native_type>)
+  constexpr void set(std::span<const tjg::Int<U, E>, M> values) noexcept
+    { _setInt(values); }
+
+  template<typename U, std::endian E>
+  requires tjg::NonNarrowing<U, native_type>
+  constexpr void set(std::span<const tjg::Int<U, E>> values) {
+    if (values.size() != static_cast<std::size_t>(Lanes))
+      throw std::out_of_range{"NeonV::set: size != Lanes"};
+    _setInt(std::span<const tjg::Int<U, E>, Lanes>{values.data(), Lanes});
+  }
+
+  // initializer_list (tjg::Int<U,E>), runtime size check
+  template<typename U, std::endian E>
+  constexpr void set(std::initializer_list<tjg::Int<U, E>> ilist) noexcept {
+    if (ilist.size() != static_cast<std::size_t>(Lanes))
+      throw std::out_of_range{"NeonV::set: initializer_list size != Lanes"};
+    _setInt(std::span<const tjg::Int<U, E>, Lanes>{ilist.begin(), Lanes});
+  }
+
+  //----------------------------------------------------------
+  // operator= forwarding to set(...)
+  //----------------------------------------------------------
+  template<typename V, std::size_t M>
+  requires (M == static_cast<std::size_t>(Lanes)
+    && tjg::NonNarrowing<V, native_type>)
+  constexpr NeonV& operator=(std::span<const V, M> values) noexcept
+    { set(values); return *this; }
+
+  template<typename V>
+  requires tjg::NonNarrowing<V, native_type>
+  constexpr NeonV& operator=(std::span<const V> values) noexcept
+    { set(values); return *this; }
+
+  // init-list native
+  template<typename V>
+  requires tjg::NonNarrowing<V, native_type>
+  constexpr NeonV& operator=(std::initializer_list<V> ilist) noexcept
+    { set(ilist); return *this; }
+
+  // spans of tjg::Int<U,E>
+  template<typename U, std::endian E, std::size_t M>
+  requires (M == static_cast<std::size_t>(Lanes)
+    && tjg::NonNarrowing<U, native_type>)
+  NeonV& operator=(std::span<const tjg::Int<U, E>, M> values)
+    { set(values); return *this; }
+
+  template<typename U, std::endian E>
+  requires tjg::NonNarrowing<U, native_type>
+  constexpr NeonV& operator=(std::span<const tjg::Int<U, E>> values) noexcept
+    { set(values); return *this; }
+
+  // init-list tjg::Int<U,E>
+  template<typename U, std::endian E>
+  constexpr NeonV& operator=(std::initializer_list<tjg::Int<U, E>> ilist)
+    noexcept
+    { set(ilist); return *this; }
+
+  //----------------------------------------------------------
+  // Constructors (native-only): span + variadic
+  //----------------------------------------------------------
+  template<typename V, std::size_t M>
+  requires (M == static_cast<std::size_t>(Lanes)
+    && tjg::NonNarrowing<V, native_type>)
+  constexpr explicit NeonV(std::span<const V, M> s) noexcept { set(s); }
+
+  template<typename V>
+  requires tjg::NonNarrowing<V, native_type>
+  constexpr explicit NeonV(std::span<const V> s) { set(s); }
+
+  template<class... Args>
+  requires (sizeof...(Args) == Lanes
+    && (tjg::NonNarrowing<Args, native_type> && ...))
+  constexpr explicit NeonV(Args&&... args) noexcept
+    { set(std::forward<Args>(args)...); }
+
+  // --------------------------------------------------------------------------
+  //  read access
+  // --------------------------------------------------------------------------
+  constexpr void get(full_type* result) const noexcept
+    { *result = (full_type) r; }
+
+  constexpr operator full_type() const noexcept
+    { return (full_type) r; }
+
+  template<std::endian E>
+  constexpr void get(tjg::Int<full_type, E>* result) const noexcept {
+    if constexpr (E == std::endian::native)
+      result->raw() = (full_type) r;
+    else
+      result->raw() = (full_type) FullSwap(r);
+  }
+
+  template<std::endian E>
+  constexpr operator tjg::Int<full_type, E>() const noexcept {
+    tjg::Int<full_type, E> result;
+    if constexpr (E == std::endian::native)
+      result.raw() = (full_type) r;
+    else
+      result.raw() = (full_type) FullSwap(r);
+    return result;
+  }
+
+  constexpr native_type get(int idx) const {
+    using namespace std::literals;
+    if (idx < 0 || idx >= static_cast<int>(Lanes))
+      throw std::out_of_range{"NeonV::get("s + std::to_string(idx) + "): "s};
+    return r[idx];
+  }
+
+  constexpr void set(int idx, native_type x) {
+    using namespace std::literals;
+    if (idx < 0 || idx >= static_cast<int>(Lanes))
+      throw std::out_of_range{"NeonV::set("s + std::to_string(idx) + "): "s};
+    r[idx] = x;
+  }
 
   struct Proxy {
     NeonV& self;
     int i;
-    constexpr element_type value() const noexcept { return self.get(i); }
-    constexpr operator typename element_type::value_type() const noexcept
-      { return value().value(); }
-    constexpr operator element_type() const noexcept { return value(); }
-    constexpr Proxy& operator=(const element_type& v) noexcept
-      { self.set(i, v); return *this; }
+    constexpr operator native_type() const { return self.get(i); }
+    constexpr Proxy& operator=(native_type x) { self.set(i, x); return *this; }
   }; // Proxy
 
   Proxy operator[](int i) & { return Proxy{*this, i}; }
-  element_type operator[](int i) const & { return get(i); }
+  native_type operator[](int i) const & { return get(i); }
 
-  element_type operator[](int i) && { return get(i); }
+  native_type operator[](int i) && { return get(i); }
 
-#ifndef TJG_INT_ONLY
-  constexpr void set(std::uint64_t x) noexcept
-    requires (sizeof(register_type) == sizeof(std::uint64_t))
-    { set(tjg::Int{x}); }
-
-  constexpr void set(std::uint64_t lo, std::uint64_t hi = 0) noexcept
-    requires (sizeof(register_type) == sizeof(uint128_t))
-    { set(tjg::Int{lo}, tjg::Int{hi}); }
-
-  constexpr void set(uint128_t x) noexcept
-    requires (sizeof(register_type) == sizeof(uint128_t))
-    { set(tjg::Int{x}); }
-
-  constexpr void set(std::span<const native_type, N> src) noexcept {
-    using U = Native<std::endian::native>;
-    auto p = reinterpret_cast<const U*>(src.data());
-    load(std::span<const U, N>{p, N});
+// Native-type helpers.
+  template<typename V>
+    requires tjg::NonNarrowing<native_type, V>
+  constexpr void get(std::span<V, Lanes> values) const noexcept {
+    [&]<int... Is>(std::integer_sequence<int, Is...>) {
+      ((values[Is] = static_cast<V>(r[Is])), ...);
+    }(std::make_integer_sequence<int, static_cast<int>(Lanes)>{});
   }
 
-  constexpr NeonV& operator=(std::uint64_t lo)
-    noexcept requires(sizeof(register_type) == sizeof(std::uint64_t))
-    { set(tjg::Int{lo}); return *this; }
-
-  constexpr NeonV& operator=(uint128_t x) noexcept
-    requires (sizeof(register_type) == sizeof(uint128_t))
-    { set(tjg::Int{x}); return *this; }
-
-  constexpr NeonV& operator=(std::span<const native_type, N> src) noexcept
-    { set(src); return *this; }
-
-  constexpr explicit NeonV(std::uint64_t lo) noexcept
-    requires (sizeof(register_type) == sizeof(std::uint64_t))
-    { set(tjg::Int{lo}); }
-
-  constexpr explicit NeonV(std::uint64_t lo, std::uint64_t hi=0) noexcept
-    requires (sizeof(register_type) == 2 * sizeof(std::uint64_t))
-    { set(tjg::Int{lo}, tjg::Int{hi}); }
-
-  constexpr explicit NeonV(uint128_t x) noexcept
-    requires (sizeof(register_type) == sizeof(uint128_t)) { set(tjg::Int{x}); }
-
-  constexpr explicit NeonV(std::span<const native_type, N> src) noexcept
-    { set(src); }
-
-  constexpr std::array<native_type, N>&
-  get(std::array<native_type, N>& dst) const noexcept {
-    using U = Native<std::endian::native>;
-    auto p = reinterpret_cast<native_type*>(dst.data());
-    store(std::span<U, N>{p});
-    return dst;
+  template<typename V>
+    requires tjg::NonNarrowing<native_type, V>
+  constexpr void get(std::span<V> values) const {
+    if (values.size() != Lanes)
+      throw std::out_of_range{"NeonV::get: span size != Lanes"};
+    get(std::span<V, Lanes>{values.data(), Lanes});
   }
 
-  constexpr void get(uint128_t* result) const noexcept
-    requires (sizeof(register_type) == sizeof(uint128_t))
-  {
-    using U = U128<std::endian::native>;
-    get(reinterpret_cast<U*>(result));
+  template<typename U, std::endian E>
+    requires tjg::NonNarrowing<native_type, U>
+  constexpr void get(std::span<tjg::Int<U, E>, Lanes> values) const noexcept {
+    auto tmp = r;
+    if constexpr (E != std::endian::native)
+      tmp = ByteSwap(tmp);
+    [&]<int... Is>(std::integer_sequence<int, Is...>) {
+      ((values[Is].raw() = static_cast<U>(tmp[Is])), ...);
+    }(std::make_integer_sequence<int, static_cast<int>(Lanes)>{});
   }
 
-  constexpr uint128_t value() const noexcept
-    requires (sizeof(register_type) == sizeof(uint128_t))
-    {  U128<std::endian::native> tmp; return get(&tmp).value(); }
+  template<typename U, std::endian E>
+    requires tjg::NonNarrowing<native_type, U>
+  constexpr void get(std::span<tjg::Int<U, E>> values) const {
+    if (values.size() != Lanes)
+      throw std::out_of_range{"NeonV::get: span size != Lanes"};
+    get(std::span<tjg::Int<U, E>, Lanes>{values.data(), Lanes});
+  }
 
-  constexpr operator uint128_t() const noexcept
-    requires (sizeof(register_type) == sizeof(uint128_t))
-    { return value(); }
+  template<typename V>
+  requires tjg::NonNarrowing<native_type, V>
+  void get(std::array<V, Lanes>& dst) const noexcept { get(std::span{dst}); }
 
-  constexpr std::uint64_t value() const noexcept
-    requires (sizeof(register_type) == sizeof(std::uint64_t))
-    {  U64<std::endian::native> tmp; return get(&tmp).value(); }
-
-  constexpr operator std::uint64_t() const noexcept
-    requires (sizeof(register_type) == sizeof(std::uint64_t))
-    { return value(); }
-
-  constexpr native_type& get(int idx, native_type& dst) const noexcept
-    { return dst = get(idx).value(); }
-
-  constexpr void set(int idx, native_type x) noexcept
-    { set(idx, tjg::Int{x}); }
-#endif
+  template<typename U, std::endian E>
+  requires tjg::NonNarrowing<native_type, U>
+  void get(std::array<tjg::Int<U, E>, Lanes>& dst) const noexcept
+    { get(std::span{dst}); }
 
   constexpr NeonV operator^(NeonV rhs) const noexcept { return NeonV{r ^ rhs.r}; }
   constexpr NeonV& operator^=(NeonV rhs) noexcept { r ^= rhs.r; return *this; }
@@ -447,8 +432,8 @@ struct NeonV {
 constexpr NeonV<uint64x2_t> ClMult(NeonV<uint64x2_t> x, NeonV<poly64x2_t> y)
   noexcept
 {
-  auto p1 = tjg::clmul(x[0].value(), y[0].value());
-  auto p2 = tjg::clmul(x[1].value(), y[1].value());
+  auto p1 = tjg::clmul(x[0], y[0]);
+  auto p2 = tjg::clmul(x[1], y[1]);
   return NeonV<uint64x2_t>(p1 ^ p2);
 }
 
@@ -460,9 +445,9 @@ template<NeonRegister R>
 void PrintRegister(R v) {
   using namespace std;
   using T = ScalarT<R>;
-  constexpr auto N = LanesV<R>;
+  constexpr auto Lanes = LanesV<R>;
   constexpr auto w = 2 * sizeof(T);
-  for (int i = 0; i != N; ++i)
+  for (int i = 0; i != Lanes; ++i)
     cout << setfill(' ') << setw(4) << i
          << " 0x" << hex << setfill('0') << setw(w) << P_t<T>{v[i]} << dec
          << endl;

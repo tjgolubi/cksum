@@ -1,4 +1,5 @@
 #include "cksum.hpp"
+#include "CrcUpdate.hpp"
 
 #include <string_view>
 #include <filesystem>
@@ -18,6 +19,23 @@ int main(int argc, const char* argv[]) {
     std::cout << "cksum (coreutils-9.7)\n";
     return EXIT_SUCCESS;
   }
+#if 0
+  {
+    using namespace std;
+    cout << setfill('0') << hex;
+    for (int i = 0; i != 8; ++i) {
+      cout << "{";
+      for (int j = 0; j != 256; ++j) {
+        if (j % 8 == 0)
+          cout << "\n ";
+        cout << " 0x";
+        cout << setw(8) << std::byteswap(CrcTab[i][j]) << ',';
+      }
+      cout << "\n}";
+    }
+    cout << setfill(' ') << dec;
+  }
+#endif
   for (int i = 1; i != argc; ++i) {
     auto fname = fs::path{argv[i]};
     auto fp = std::ifstream{fname, std::ios::in | std::ios::binary};

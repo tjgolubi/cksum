@@ -1,130 +1,72 @@
-/* cksum -- calculate and print POSIX checksums and sizes of files
-   Copyright (C) 2021-2025 Free Software Foundation, Inc. */
-
+#include "CrcUpdate.hpp"
 #include "cksum.hpp"
 
-#include <sys/types.h>
+#include <bit>
+
 #include <x86intrin.h>
 
-/* Calculate CRC32 using PCLMULQDQ CPU instruction found in x86/x64 CPUs */
+using uint128_t = unsigned __int128;
 
-uint_fast32_t cksum_pclmul(uint_fast32_t crc, void* buf, std::size_t* bufsize)
+constexpr __m128i ClMult(__m128i x, __m128i y) {
+  auto t = _mm_clmulepi64_si128(x, y, 0x00);
+       x = _mm_clmulepi64_si128(x, y, 0x11);
+  return x ^ t;
+} // ClMult
+
+constexpr __m128i ByteSwap(__m128i x) {
+  static const auto shuffle_constant = _mm_set_epi8(
+                          0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+  return _mm_shuffle_epi8(x, shuffle_constant);
+} // ByteSwap
+
+constexpr __m128i ByteSwap(uint128_t x) { return ByteSwap((__m128i) x); }
+
+uint128_t do_cksum_pclmul(std::uint32_t crc, const uint128_t* buf, size_t num)
   noexcept
 {
-
-  /* These constants and general algorithms are taken from the Intel whitepaper
-     "Fast CRC Computation for Generic Polynomials Using PCLMULQDQ Instruction"
-     */
   const __m128i single_mult_constant = _mm_set_epi64x(0xc5b9cd4c, 0xe8a45605);
   const __m128i four_mult_constant   = _mm_set_epi64x(0x8833794c, 0xe6228b11);
 
-  /* Constant to byteswap a full SSE register */
-  const __m128i shuffle_constant = _mm_set_epi8(
-                          0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+  __m128i data0 = ByteSwap(buf[0]);
 
-  auto num = *bufsize / sizeof(__m128i);
-  __m128i* datap = (__m128i*) buf;
+  data0 ^= (__m128i) (uint128_t{crc} << (128-32));
 
-  __m128i data;
-  __m128i data2;
-  __m128i data3;
-  __m128i data4;
-  __m128i data5;
-  __m128i data6;
-  __m128i data7;
-  __m128i data8;
-  __m128i fold_data;
-  __m128i xor_crc;
-
-  /* Fold in parallel eight 16-byte blocks into four 16-byte blocks */
   if (num >= 8) {
-    data  = _mm_loadu_si128(datap);
-    data  = _mm_shuffle_epi8(data, shuffle_constant);
-    /* XOR in initial CRC value (for us 0 so no effect), or CRC value
-       calculated for previous BUFLEN buffer from fread */
-    xor_crc = _mm_set_epi32(crc, 0, 0, 0);
-    crc = 0;
-    data  = _mm_xor_si128(data, xor_crc);
-    data3 = _mm_loadu_si128(datap + 1);
-    data3 = _mm_shuffle_epi8(data3, shuffle_constant);
-    data5 = _mm_loadu_si128(datap + 2);
-    data5 = _mm_shuffle_epi8(data5, shuffle_constant);
-    data7 = _mm_loadu_si128(datap + 3);
-    data7 = _mm_shuffle_epi8(data7, shuffle_constant);
+    __m128i data1 = ByteSwap(buf[1]);
+    __m128i data2 = ByteSwap(buf[2]);
+    __m128i data3 = ByteSwap(buf[3]);
 
-    while (num >= 8) {
-      datap += 4;
-
-      /* Do multiplication here for four consecutive 16 byte blocks */
-      data2 = _mm_clmulepi64_si128(data , four_mult_constant, 0x00);
-      data  = _mm_clmulepi64_si128(data , four_mult_constant, 0x11);
-      data4 = _mm_clmulepi64_si128(data3, four_mult_constant, 0x00);
-      data3 = _mm_clmulepi64_si128(data3, four_mult_constant, 0x11);
-      data6 = _mm_clmulepi64_si128(data5, four_mult_constant, 0x00);
-      data5 = _mm_clmulepi64_si128(data5, four_mult_constant, 0x11);
-      data8 = _mm_clmulepi64_si128(data7, four_mult_constant, 0x00);
-      data7 = _mm_clmulepi64_si128(data7, four_mult_constant, 0x11);
-
-      /* Now multiplication results for the four blocks is xor:ed with
-         next four 16 byte blocks from the buffer. This effectively
-         "consumes" the first four blocks from the buffer.
-         Keep xor result in variables for multiplication in next
-         round of loop. */
-      data  = _mm_xor_si128(data, data2);
-      data2 = _mm_loadu_si128(datap + 0);
-      data2 = _mm_shuffle_epi8(data2, shuffle_constant);
-      data  = _mm_xor_si128(data, data2);
-
-      data3 = _mm_xor_si128(data3, data4);
-      data4 = _mm_loadu_si128(datap + 1);
-      data4 = _mm_shuffle_epi8(data4, shuffle_constant);
-      data3 = _mm_xor_si128(data3, data4);
-
-      data5 = _mm_xor_si128(data5, data6);
-      data6 = _mm_loadu_si128(datap + 2);
-      data6 = _mm_shuffle_epi8(data6, shuffle_constant);
-      data5 = _mm_xor_si128(data5, data6);
-
-      data7 = _mm_xor_si128(data7, data8);
-      data8 = _mm_loadu_si128(datap + 3);
-      data8 = _mm_shuffle_epi8(data8, shuffle_constant);
-      data7 = _mm_xor_si128(data7, data8);
-
-      num -= 4;
+    for ( ; num >= 8; num -= 4) {
+      buf += 4;
+      data0 = ClMult(data0, four_mult_constant) ^ ByteSwap(buf[0]);
+      data1 = ClMult(data1, four_mult_constant) ^ ByteSwap(buf[1]);
+      data2 = ClMult(data2, four_mult_constant) ^ ByteSwap(buf[2]);
+      data3 = ClMult(data3, four_mult_constant) ^ ByteSwap(buf[3]);
     }
-    /* At end of loop we write out results from variables back into
-       the buffer, for use in single fold loop */
-    data = _mm_shuffle_epi8(data, shuffle_constant);
-    _mm_storeu_si128(datap + 0, data);
-    data3 = _mm_shuffle_epi8(data3, shuffle_constant);
-    _mm_storeu_si128(datap + 1, data3);
-    data5 = _mm_shuffle_epi8(data5, shuffle_constant);
-    _mm_storeu_si128(datap + 2, data5);
-    data7 = _mm_shuffle_epi8(data7, shuffle_constant);
-    _mm_storeu_si128(datap + 3, data7);
-  }
 
-  /* Fold two 16-byte blocks into one 16-byte block */
-  if (num >= 2) {
-    data = _mm_loadu_si128(datap);
-    data = _mm_shuffle_epi8(data, shuffle_constant);
-    xor_crc = _mm_set_epi32(crc, 0, 0, 0);
-    crc = 0;
-    data = _mm_xor_si128(data, xor_crc);
-    while (num >= 2) {
-      ++datap;
-      data2 = _mm_clmulepi64_si128(data, single_mult_constant, 0x00);
-      data  = _mm_clmulepi64_si128(data, single_mult_constant, 0x11);
-      fold_data = _mm_loadu_si128(datap);
-      fold_data = _mm_shuffle_epi8(fold_data, shuffle_constant);
-      data = _mm_xor_si128(data, data2);
-      data = _mm_xor_si128(data, fold_data);
-      --num;
-    }
-    data = _mm_shuffle_epi8(data, shuffle_constant);
-    _mm_storeu_si128(datap, data);
+    data0 = ClMult(data0, single_mult_constant) ^ data1;
+    data0 = ClMult(data0, single_mult_constant) ^ data2;
+    data0 = ClMult(data0, single_mult_constant) ^ data3;
+    num -= 3;
+    buf += 3;
   }
+  for ( ; num >= 2; --num)
+    data0 = ClMult(data0, single_mult_constant) ^ ByteSwap(*++buf);
+  return (uint128_t) ByteSwap(data0);
+} // do_cksum_pclmul
 
-  *bufsize = *bufsize % sizeof(__m128i) + num * sizeof(__m128i);
-  return crc;
+std::uint32_t
+cksum_pclmul(std::uint32_t crc, const void* buf, std::size_t size) noexcept {
+  auto n = size / sizeof(uint128_t);
+  auto r = size % sizeof(uint128_t);
+  if (n < 2) {
+    crc = std::byteswap(crc);
+    crc = CrcUpdate(crc, buf, size);
+    return std::byteswap(crc);
+  }
+  auto p = reinterpret_cast<const uint128_t*>(buf);
+  auto u = do_cksum_pclmul(crc, p, n);
+  crc = CrcUpdate(0, &u, sizeof(u));
+  crc = CrcUpdate(crc, p+n,r);
+  return std::byteswap(crc);
 } // cksum_pclmul

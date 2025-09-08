@@ -429,7 +429,7 @@ public:
   constexpr NeonV& operator^=(NeonV rhs) noexcept { r ^= rhs.r; return *this; }
 }; // NeonV
 
-constexpr NeonV<uint64x2_t> ClMult(NeonV<uint64x2_t> x, NeonV<poly64x2_t> y)
+constexpr NeonV<uint64x2_t> ClMulDiag(NeonV<uint64x2_t> x, NeonV<poly64x2_t> y)
   noexcept
 {
   auto p1 = tjg::clmul(x[0], y[0]);

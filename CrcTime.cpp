@@ -82,10 +82,11 @@ int main() {
 
   constexpr int loops = 30;
   for (int i = 0; i != loops; ++i) {
- // failed += !TestCrc(cksum_vmull  , "Vmull" , std::span{data});
+    failed += !TestCrc(cksum_vmull  , "Vmull"  , std::span{data});
+    failed += !TestCrc(cksum_vmull0 , "Vmull0" , std::span{data});
     failed += !TestCrc(cksum_slice8 , "Slice8" , std::span{data});
-    failed += !TestCrc(cksum_pclmul , "PclMul" , std::span{data});
-    failed += !TestCrc(cksum_pclmula, "PclMulA", std::span{data});
+//  failed += !TestCrc(cksum_pclmul , "PclMul" , std::span{data});
+//  failed += !TestCrc(cksum_pclmula, "PclMulA", std::span{data});
   }
 
   for (const auto& [name, dt]: Times) {

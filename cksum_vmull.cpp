@@ -1,4 +1,5 @@
 #include "CrcUpdate.hpp"
+#include "Reflect.hpp"
 #include "cksum.hpp"
 #include "Neon.hpp"
 
@@ -6,46 +7,64 @@
 
 #include <bit>
 
-using U128 = tjg::Int<uint128_t, std::endian::big>;
+constexpr uint128_t Uint128(std::uint64_t hi, std::uint64_t lo) noexcept
+  { return (uint128_t{hi} << 64) | uint128_t{lo}; }
+
+namespace tjg::IntMath {
+
+constexpr uint128_t Reflect(uint128_t x) noexcept {
+  auto lo = static_cast<std::uint64_t>(x);
+  auto hi = static_cast<std::uint64_t>(x >> 64);
+  return Uint128(Reflect(lo), Reflect(hi));
+}
+
+} // tjg::IntMath
+
+using U128 = uint128_t;
 
 U128 do_cksum_vmull(std::uint32_t crc, const U128* buf, std::size_t num)
   noexcept
 {
-  (void) tjg::VerifyInt<std::uint64_t>{};
-  (void) tjg::VerifyInt<uint128_t>{};
+  using tjg::IntMath::Reflect;
+  using std::byteswap;
 
   using NeonVec  = NeonV<uint64x2_t>;
   using NeonPoly = NeonV<poly64x2_t>;
 
-  static const NeonPoly SingleK{0xe8a45605, 0xc5b9cd4c};
-  static const NeonPoly FourK  {0xe6228b11, 0x8833794c};
+  constexpr std::uint32_t SingleK_lo = 0xe8a45605;
+  constexpr std::uint32_t SingleK_hi = 0xc5b9cd4c;
+  constexpr std::uint32_t FourK_lo   = 0xe6228b11;
+  constexpr std::uint32_t FourK_hi   = 0x8833794c;
 
-  NeonVec data0{buf[0]};
+  static const NeonPoly SingleK{SingleK_lo, SingleK_hi};
+  static const NeonPoly FourK  {  FourK_lo,   FourK_hi};
+
+  NeonVec data0{byteswap(buf[0])};
 
   data0 ^= NeonVec{uint128_t{crc} << (128-32)};
 
   if (num >= 8) {
-    NeonVec data1{buf[1]};
-    NeonVec data2{buf[2]};
-    NeonVec data3{buf[3]};
+    NeonVec data1{byteswap(buf[1])};
+    NeonVec data2{byteswap(buf[2])};
+    NeonVec data3{byteswap(buf[3])};
 
     for ( ; num >= 8; num -= 4) {
       buf += 4;
-      data0 = ClMult(data0, FourK) ^ NeonVec{buf[0]};
-      data1 = ClMult(data1, FourK) ^ NeonVec{buf[1]};
-      data2 = ClMult(data2, FourK) ^ NeonVec{buf[2]};
-      data3 = ClMult(data3, FourK) ^ NeonVec{buf[3]};
+      data0 = ClMulDiag(data0, FourK) ^ NeonVec{byteswap(buf[0])};
+      data1 = ClMulDiag(data1, FourK) ^ NeonVec{byteswap(buf[1])};
+      data2 = ClMulDiag(data2, FourK) ^ NeonVec{byteswap(buf[2])};
+      data3 = ClMulDiag(data3, FourK) ^ NeonVec{byteswap(buf[3])};
     }
 
-    data0 = ClMult(data0, SingleK) ^ data1;
-    data0 = ClMult(data0, SingleK) ^ data2;
-    data0 = ClMult(data0, SingleK) ^ data3;
+    data0 = ClMulDiag(data0, SingleK) ^ data1;
+    data0 = ClMulDiag(data0, SingleK) ^ data2;
+    data0 = ClMulDiag(data0, SingleK) ^ data3;
     num -= 3;
     buf += 3;
   }
   for ( ; num >= 2; --num)
-    data0 = ClMult(data0, SingleK) ^ NeonVec{*++buf};
-  return U128{data0};
+    data0 = ClMulDiag(data0, SingleK) ^ NeonVec{byteswap(*++buf)};
+  return byteswap(U128{data0});
 } // do_cksum_vmull
 
 std::uint32_t cksum_vmull(std::uint32_t crc, const void* buf, size_t size)

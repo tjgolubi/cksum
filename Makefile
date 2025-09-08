@@ -29,6 +29,7 @@ ifeq ($(COMPILER), clang)
 CDEFS+=-DUSE_VMULL_CRC32=1
 SRC1+=cksum_vmull.cpp
 SRC2+=cksum_vmull.cpp
+SRC2+=cksum_vmull0.cpp
 endif
 
 SOURCE:=$(SRC1)

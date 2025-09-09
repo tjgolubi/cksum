@@ -82,6 +82,10 @@ public:
   constexpr explicit Int(T x) noexcept { _set(x); }
   /// @}
 
+  // Construct from raw storage.
+  static constexpr Int Raw(T x) noexcept
+    { Int rval; rval._raw = x; return rval; }
+
   /// @name Assignment
   /// @{
   constexpr Int& operator=(const Int&) = default;

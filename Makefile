@@ -23,7 +23,7 @@ ifeq ($(COMPILER), gcc)
 CDEFS+=-DUSE_PCLMUL_CRC32=1
 SRC1+=cksum_pclmul.cpp
 SRC2+=cksum_pclmul.cpp
-SRC2+=cksum_pclmula.cpp
+SRC2+=cksum_pclmul0.cpp
 endif
 ifeq ($(COMPILER), clang)
 CDEFS+=-DUSE_VMULL_CRC32=1
@@ -60,7 +60,7 @@ bigfile.bin:
 	dd if=/dev/urandom of=$@ bs=1G count=2 status=progress
 
 cksum.txt: bigfile.bin
-	"cksum" bigfile.bin > $@
+	cksum bigfile.bin > $@
 
 tjg.txt:
 	echo "123456789" > $@

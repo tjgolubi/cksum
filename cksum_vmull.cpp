@@ -9,7 +9,6 @@
 
 using U128 = tjg::Int<uint128_t, std::endian::big>;
 
-
 U128 do_cksum_vmull(std::uint32_t crc, const U128* buf, std::size_t num)
   noexcept
 {
@@ -48,6 +47,7 @@ U128 do_cksum_vmull(std::uint32_t crc, const U128* buf, std::size_t num)
   data0 ^= NeonVec{Reflect(crc)};
 #else
   data0 ^= NeonVec{U128{crc} << (128-32)};
+#endif
 #endif
 
 #if 0

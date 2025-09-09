@@ -213,7 +213,7 @@ private:
 
 public:
   //----------------------------------------------------------
-  // set(...) overloads — native lane-like
+  // set(...) overloads -- native lane-like
   //----------------------------------------------------------
   template<std::integral V, std::size_t M>
   requires (M == static_cast<std::size_t>(Lanes)
@@ -247,7 +247,7 @@ public:
   }
 
   //----------------------------------------------------------
-  // set(...) overloads — tjg::Int<U, E> sources
+  // set(...) overloads -- tjg::Int<U, E> sources
   //----------------------------------------------------------
   template<typename U, std::endian E, std::size_t M>
   requires (M == static_cast<std::size_t>(Lanes)
@@ -425,11 +425,20 @@ public:
   void get(std::array<tjg::Int<U, E>, Lanes>& dst) const noexcept
     { get(std::span{dst}); }
 
-  constexpr NeonV operator^(NeonV rhs) const noexcept { return NeonV{r ^ rhs.r}; }
+  constexpr NeonV operator^(NeonV rhs) const noexcept
+    { return NeonV{r ^ rhs.r}; }
   constexpr NeonV& operator^=(NeonV rhs) noexcept { r ^= rhs.r; return *this; }
+  constexpr NeonV operator<<(std::integral auto rhs) const noexcept
+    { return NeonV{r << rhs}; }
+  constexpr NeonV operator>>(std::integral auto rhs) const noexcept
+    { return NeonV{r >> rhs}; }
+  constexpr NeonV& operator<<=(std::integral auto rhs) const noexcept
+    { return r <<= rhs; return *this; }
+  constexpr NeonV& operator>>=(std::integral auto rhs) const noexcept
+    { return r >>= rhs; return *this; }
 }; // NeonV
 
-constexpr NeonV<uint64x2_t> ClMult(NeonV<uint64x2_t> x, NeonV<poly64x2_t> y)
+constexpr NeonV<uint64x2_t> ClMulDiag(NeonV<uint64x2_t> x, NeonV<poly64x2_t> y)
   noexcept
 {
   auto p1 = tjg::clmul(x[0], y[0]);

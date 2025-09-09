@@ -59,7 +59,7 @@ FILES:=Int.hpp README.md cksum.txt CrcTab.cpp main.cpp tjg.bin tjg.txt bigfile.b
 bigfile.bin:
 	dd if=/dev/urandom of=$@ bs=1G count=2 status=progress
 
-cksum.txt:
+cksum.txt: bigfile.bin
 	"cksum" bigfile.bin > $@
 
 tjg.txt:

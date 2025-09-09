@@ -8,17 +8,24 @@ include $(SWDEV)/project.mk
 APP:=$(abspath $(HOME)/App)
 BOOST:=$(APP)/boost
 MP11:=$(APP)/mp11
+BIT:=$(APP)/bit
 
 # Must use "=" instead of ":=" because $E will be defined below.
 CKSUM_E=cksum.$E
 CRCTIME_E=CrcTime.$E
+GEN_KS_E=GenKs.$E
+GEN_KS2_E=GenKs2.$E
 
 TARGET1=$(CKSUM_E)
 TARGET2=$(CRCTIME_E)
-TARGETS=$(TARGET1) $(TARGET2)
+TARGET3=$(GEN_KS_E)
+TARGET4=$(GEN_KS2_E)
+TARGETS=$(TARGET1) $(TARGET2) $(TARGET3) $(TARGET4)
 
 SRC1:=main.cpp cksum.cpp CrcTab.cpp cksum_slice8.cpp
 SRC2:=CrcTime.cpp cksum.cpp CrcTab.cpp cksum_slice8.cpp
+SRC3:=GenKs.cpp
+SRC4:=GenKs2.cpp
 ifeq ($(COMPILER), gcc)
 CDEFS+=-DUSE_PCLMUL_CRC32=1
 SRC1+=cksum_pclmul.cpp
@@ -32,10 +39,10 @@ SRC2+=cksum_vmull.cpp
 SRC2+=cksum_vmull0.cpp
 endif
 
-SOURCE:=$(SRC1)
+SOURCE:=$(SRC1) $(SRC2) $(SRC3) $(SRC4)
 
 #SYSINCL:=$(addsuffix /include, $(UNITS)/core $(UNITS)/systems $(GSL))
-SYSINCL:=$(BOOST) $(addsuffix /include, $(MP11))
+SYSINCL:=$(BOOST) $(addsuffix /include, $(MP11) $(BIT))
 INCLUDE:=$(PROJDIR)
 
 # Must use "=" because LIBS will be changed below.
@@ -85,4 +92,10 @@ $(TARGET1): $(OBJ1) $(LIBS)
         $(LINK)
 
 $(TARGET2): $(OBJ2) $(LIBS)
+        $(LINK)
+
+$(TARGET3): $(OBJ3) $(LIBS)
+        $(LINK)
+
+$(TARGET4): $(OBJ4) $(LIBS)
         $(LINK)

@@ -427,6 +427,9 @@ public:
 
   constexpr NeonV operator^(NeonV rhs) const noexcept { return NeonV{r ^ rhs.r}; }
   constexpr NeonV& operator^=(NeonV rhs) noexcept { r ^= rhs.r; return *this; }
+
+  constexpr NeonV operator<<(std::integral auto rhs) const noexcept { return NeonV{r << rhs}; }
+  constexpr NeonV& operator<<=(std::integral auto rhs) noexcept { r << rhs; return *this; }
 }; // NeonV
 
 constexpr NeonV<uint64x2_t> ClMulDiag(NeonV<uint64x2_t> x, NeonV<poly64x2_t> y)

@@ -47,7 +47,7 @@ U128 do_cksum_vmull(std::uint32_t crc, const U128* buf, std::size_t num)
     buf += 3;
   }
   for ( ; num >= 2; --num)
-    data0 = ClMult(data0, SingleK) ^ NeonVec{*++buf};
+    data0 = ClMult(data0, SingleK) ^ Load(*++buf);
   return Unload(data0);
 } // do_cksum_vmull
 

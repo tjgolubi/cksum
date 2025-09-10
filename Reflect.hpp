@@ -77,4 +77,16 @@ constexpr uint128_t Reflect(uint128_t x) noexcept {
   return x;
 } // Reflect 128-bit
 
+namespace test {
+  constexpr std::uint64_t Hi = 0x0123456789abcdefull;
+  constexpr std::uint64_t Lo = 0xfedcba9876543210ull;
+  constexpr auto V = U128(Hi, Lo);
+  static_assert(
+    Reflect(V) == ( ((uint128_t) Reflect(Lo) << 64) | (uint128_t) Reflect(Hi) ),
+    "Reflect(uint128_t) must equal Swap64(Reflect64Each)"
+  );
+  static_assert( Reflect(V) == Reflect(Reflect(Reflect(V))) ); // cheap double-check
+  static_assert( Reflect(Reflect(V)) == V, "Reflect must be an involution");
+} // test
+
 } // tjg::IntMath

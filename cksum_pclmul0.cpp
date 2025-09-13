@@ -11,7 +11,7 @@ using uint128_t = unsigned __int128;
 
 using U128 = uint128_t;
 
-U128 do_cksum_pclmula(std::uint32_t crc, const U128* buf, size_t num)
+U128 do_cksum_pclmul0(std::uint32_t crc, const U128* buf, size_t num)
   noexcept
 {
 
@@ -100,10 +100,10 @@ U128 do_cksum_pclmula(std::uint32_t crc, const U128* buf, size_t num)
 
   data0 = _mm_shuffle_epi8(data0, ShuffleK);
   return (U128) data0;
-} // do_cksum_pclmula
+} // do_cksum_pclmul0
 
 std::uint32_t
-cksum_pclmula(std::uint32_t crc, const void* buf, std::size_t size) noexcept {
+cksum_pclmul0(std::uint32_t crc, const void* buf, std::size_t size) noexcept {
   auto n = size / sizeof(U128);
   auto r = size % sizeof(U128);
   if (n < 2) {
@@ -112,8 +112,8 @@ cksum_pclmula(std::uint32_t crc, const void* buf, std::size_t size) noexcept {
     return std::byteswap(crc);
   }
   auto p = reinterpret_cast<const U128*>(buf);
-  auto u = do_cksum_pclmula(crc, p, n);
+  auto u = do_cksum_pclmul0(crc, p, n);
   crc = CrcUpdate(0, &u, sizeof(u));
   crc = CrcUpdate(crc, p+n,r);
   return std::byteswap(crc);
-} // cksum_pclmula
+} // cksum_pclmul0

@@ -29,9 +29,10 @@ ifeq ($(COMPILER), clang)
 CDEFS+=-DUSE_VMULL_CRC32=1
 SRC1+=cksum_vmull.cpp
 SRC2+=cksum_vmull.cpp
+SRC2+=cksum_vmull0.cpp
 endif
 
-SOURCE:=$(SRC1)
+SOURCE:=$(SRC1) $(SRC2)
 
 #SYSINCL:=$(addsuffix /include, $(UNITS)/core $(UNITS)/systems $(GSL))
 SYSINCL:=$(BOOST) $(addsuffix /include, $(MP11))
@@ -60,7 +61,7 @@ bigfile.bin:
 	dd if=/dev/urandom of=$@ bs=1G count=2 status=progress
 
 cksum.txt: bigfile.bin
-	cksum bigfile.bin > $@
+	"cksum" bigfile.bin > $@
 
 tjg.txt:
 	echo "123456789" > $@

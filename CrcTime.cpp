@@ -84,8 +84,8 @@ int main() {
   for (int i = 0; i != loops; ++i) {
     failed += !TestCrc(cksum_slice8 , "Slice8" , std::span{data});
 #ifdef USE_VMULL_CRC32
-    failed += !TestCrc(cksum_vmull  , "Vmull" , std::span{data});
-    failed += !TestCrc(cksum_vmull0 , "Vmull0", std::span{data});
+    failed += !TestCrc(cksum_vmull  , "Vmull"  , std::span{data});
+    failed += !TestCrc(cksum_vmull0 , "Vmull0" , std::span{data});
 #endif
 #ifdef USE_PCLMUL_CRC32
     failed += !TestCrc(cksum_pclmul , "PclMul" , std::span{data});

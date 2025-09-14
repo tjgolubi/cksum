@@ -12,13 +12,16 @@ MP11:=$(APP)/mp11
 # Must use "=" instead of ":=" because $E will be defined below.
 CKSUM_E=cksum.$E
 CRCTIME_E=CrcTime.$E
+MK256_E=Mk256.$E
 
 TARGET1=$(CKSUM_E)
 TARGET2=$(CRCTIME_E)
-TARGETS=$(TARGET1) $(TARGET2)
+TARGET3=$(MK256_E)
+TARGETS=$(TARGET1) $(TARGET2) $(TARGET3)
 
 SRC1:=main.cpp cksum.cpp CrcTab.cpp cksum_slice8.cpp
 SRC2:=CrcTime.cpp cksum.cpp CrcTab.cpp cksum_slice8.cpp
+SRC3:=Mk256.cpp
 ifeq ($(COMPILER), gcc)
 CDEFS+=-DUSE_PCLMUL_CRC32=1
 SRC1+=cksum_pclmul.cpp
@@ -32,7 +35,7 @@ SRC2+=cksum_vmull.cpp
 SRC2+=cksum_vmull0.cpp
 endif
 
-SOURCE:=$(SRC1) $(SRC2)
+SOURCE:=$(SRC1) $(SRC2) $(SRC3)
 
 #SYSINCL:=$(addsuffix /include, $(UNITS)/core $(UNITS)/systems $(GSL))
 SYSINCL:=$(BOOST) $(addsuffix /include, $(MP11))
@@ -47,7 +50,7 @@ include $(SWDEV)/$(COMPILER).mk
 include $(SWDEV)/build.mk
 
 CLEAN+=cksum_core.txt cksum_tjg.txt
-SCOUR+=bigfile.bin cksum.txt tjg.txt tjg.bin
+SCOUR+=bigfile.bin cksum.txt tjg.txt tjg.bin tjg256.bin
 
 .ONESHELL:
 
@@ -55,7 +58,7 @@ SCOUR+=bigfile.bin cksum.txt tjg.txt tjg.bin
 
 all: depend $(TARGETS)
 
-FILES:=Int.hpp README.md cksum.txt CrcTab.cpp main.cpp tjg.bin tjg.txt bigfile.bin
+FILES:=Int.hpp README.md cksum.txt CrcTab.cpp main.cpp tjg.bin tjg256.bin tjg.txt bigfile.bin
 
 bigfile.bin:
 	dd if=/dev/urandom of=$@ bs=1G count=2 status=progress
@@ -69,8 +72,11 @@ tjg.txt:
 tjg.bin:
 	dd if=/dev/urandom of=$@ bs=256 count=1 status=progress
 
+tjg256.bin: $(MK256_E)
+	./$(MK256_E)
+
 cksum_core.txt: $(FILES)
-	cksum $(FILES) > $@
+	"cksum" $(FILES) > $@
 
 cksum_tjg.txt: $(CKSUM_E) $(FILES)
 	./$(CKSUM_E) $(FILES) > $@
@@ -85,4 +91,7 @@ $(TARGET1): $(OBJ1) $(LIBS)
         $(LINK)
 
 $(TARGET2): $(OBJ2) $(LIBS)
+        $(LINK)
+
+$(TARGET3): $(OBJ3) $(LIBS)
         $(LINK)

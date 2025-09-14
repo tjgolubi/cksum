@@ -1,5 +1,7 @@
-#include "CrcUpdate.hpp"
 #include "cksum.hpp"
+#include "CrcConsts.hpp"
+
+#include "CrcUpdate.hpp"
 #include "Neon.hpp"
 
 #include "Int.hpp"
@@ -17,8 +19,10 @@ U128 do_cksum_vmull(std::uint32_t crc, const U128* buf, std::size_t num)
   using NeonVec  = NeonV<uint64x2_t>;
   using NeonPoly = NeonV<poly64x2_t>;
 
-  static const NeonPoly SingleK{0xe8a45605, 0xc5b9cd4c};
-  static const NeonPoly FourK  {0xe6228b11, 0x8833794c};
+  using C = tjg::crc::CrcConsts<32, 0x04c11db7>;
+
+  static const NeonPoly SingleK{C::K128_lo, C::K128_hi};
+  static const NeonPoly FourK  {C::K512_lo, C::K512_hi};
 
   auto Load   = [&](U128 x) -> NeonVec { return NeonVec{x}; };
   auto Unload = [&](NeonVec x) -> U128 { return U128{x}; };

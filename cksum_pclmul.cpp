@@ -1,5 +1,7 @@
-#include "CrcUpdate.hpp"
 #include "cksum.hpp"
+
+#include "CrcUpdate.hpp"
+#include "CrcConsts.hpp"
 #include "Int.hpp"
 
 #include <concepts>
@@ -21,8 +23,10 @@ constexpr __m128i ClMulDiag(__m128i x, __m128i y) noexcept {
 U128 do_cksum_pclmul(std::uint32_t crc, const U128* buf, size_t num)
   noexcept
 {
-  const __m128i SingleK = _mm_set_epi64x(0xc5b9cd4c, 0xe8a45605);
-  const __m128i FourK   = _mm_set_epi64x(0x8833794c, 0xe6228b11);
+  using C = tjg::crc::CrcConsts<32, 0x04c11db7>;
+
+  const __m128i SingleK = _mm_set_epi64x(C::K128_hi, C::K128_lo);
+  const __m128i FourK   = _mm_set_epi64x(C::K512_hi, C::K512_lo);
   const __m128i ShuffleK = _mm_set_epi8(
                           0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 

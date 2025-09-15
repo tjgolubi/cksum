@@ -12,6 +12,7 @@
 #include <exception>
 #include <string>
 #include <utility>
+#include <bit>
 
 #if __has_include(<arm_neon.h>)
 #include <arm_neon.h>
@@ -31,17 +32,18 @@ using uint128_t = unsigned __int128;
 namespace simd {
 
 #if defined(SIMD_NEON)
-template<std::unsigned_integral T>
-using VectorT [[gnu::neon_vector_type(16/sizeof(T))]] = T;
+using uint8x16_t = [[clang::neon_vector_type(16)]] std::uint8_t;
+using uint16x8_t = [[clang::neon_vector_type( 8)]] std::uint16_t;
+using uint32x4_t = [[clang::neon_vector_type( 4)]] std::uint32_t;
+using uint64x2_t = [[clang::neon_vector_type( 2)]] std::uint64_t;
 #else
 template<std::unsigned_integral T>
 using VectorT [[gnu::vector_size(16)]] = T;
-#endif
-
 using uint8x16_t = VectorT<std::uint8_t >;
 using uint16x8_t = VectorT<std::uint16_t>;
 using uint32x4_t = VectorT<std::uint32_t>;
 using uint64x2_t = VectorT<std::uint64_t>;
+#endif
 
 using VectorTypes = boost::mp11::mp_list<
                                 uint8x16_t, uint16x8_t, uint32x4_t, uint64x2_t>;

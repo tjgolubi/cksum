@@ -1,21 +1,21 @@
 #include "cksum.hpp"
+#include "CrcConsts.hpp"
 
 #include "CrcUpdate.hpp"
-#include "CrcConsts.hpp"
-#include "Int.hpp"
 #include "Simd.hpp"
 
-#include <concepts>
-#include <type_traits>
-#include <bit>
+#include "Int.hpp"
 
-using uint128_t = unsigned __int128;
+#include <bit>
 
 using U128 = tjg::Int<uint128_t, std::endian::big>;
 
-U128 do_cksum_pclmul(std::uint32_t crc, const U128* buf, size_t num)
+U128 do_cksum_pclmul(std::uint32_t crc, const U128* buf, std::size_t num)
   noexcept
 {
+  (void) tjg::VerifyInt<std::uint64_t>{};
+  (void) tjg::VerifyInt<uint128_t>{};
+
   using Vec = simd::Simd<simd::uint64x2_t>;
   using C = tjg::crc::CrcConsts<32, 0x04c11db7>;
   using simd::ClMulDiag;
@@ -54,8 +54,9 @@ U128 do_cksum_pclmul(std::uint32_t crc, const U128* buf, size_t num)
   return Unload(data0);
 } // do_cksum_pclmul
 
-std::uint32_t
-cksum_pclmul(std::uint32_t crc, const void* buf, std::size_t size) noexcept {
+std::uint32_t cksum_pclmul(std::uint32_t crc, const void* buf, std::size_t size)
+  noexcept
+{
   auto n = size / sizeof(U128);
   auto r = size % sizeof(U128);
   if (n < 2) {
@@ -66,6 +67,6 @@ cksum_pclmul(std::uint32_t crc, const void* buf, std::size_t size) noexcept {
   auto p = reinterpret_cast<const U128*>(buf);
   auto u = do_cksum_pclmul(crc, p, n);
   crc = CrcUpdate(0, &u, sizeof(u));
-  crc = CrcUpdate(crc, p+n,r);
+  crc = CrcUpdate(crc, p+n, r);
   return std::byteswap(crc);
 } // cksum_pclmul

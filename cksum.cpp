@@ -24,7 +24,7 @@ static cksum_fp_t pclmul_supported(void) {
       std::cerr << "pclmul support not detected\n";
   }
   if (pclmul_enabled)
-    return cksum_pclmul;
+    return cksum_simd;
 #endif
   return nullptr;
 } // pclmul_supported
@@ -40,7 +40,7 @@ static cksum_fp_t vmull_supported(void) {
       std::cerr << "vmull support not detected\n";
   }
   if (vmull_enabled)
-    return cksum_vmull;
+    return cksum_simd;
 #endif
   return nullptr;
 } // vmull_supported

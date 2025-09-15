@@ -19,19 +19,15 @@ TARGET2=$(CRCTIME_E)
 TARGET3=$(MK256_E)
 TARGETS=$(TARGET1) $(TARGET2) $(TARGET3)
 
-SRC1:=main.cpp cksum.cpp CrcTab.cpp cksum_slice8.cpp
-SRC2:=CrcTime.cpp cksum.cpp CrcTab.cpp cksum_slice8.cpp
+SRC1:=main.cpp cksum.cpp CrcTab.cpp cksum_slice8.cpp cksum_simd.cpp
+SRC2:=CrcTime.cpp cksum.cpp CrcTab.cpp cksum_slice8.cpp cksum_simd.cpp
 SRC3:=Mk256.cpp
 ifeq ($(COMPILER), gcc)
 CDEFS+=-DUSE_PCLMUL_CRC32=1
-SRC1+=cksum_pclmul.cpp
-SRC2+=cksum_pclmul.cpp
 SRC2+=cksum_pclmul0.cpp
 endif
 ifeq ($(COMPILER), clang)
 CDEFS+=-DUSE_VMULL_CRC32=1
-SRC1+=cksum_vmull.cpp
-SRC2+=cksum_vmull.cpp
 SRC2+=cksum_vmull0.cpp
 endif
 

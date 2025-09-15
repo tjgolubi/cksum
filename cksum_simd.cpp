@@ -10,7 +10,7 @@
 
 using U128 = tjg::Int<uint128_t, std::endian::big>;
 
-U128 do_cksum_vmull(std::uint32_t crc, const U128* buf, std::size_t num)
+U128 do_cksum_simd(std::uint32_t crc, const U128* buf, std::size_t num)
   noexcept
 {
   (void) tjg::VerifyInt<std::uint64_t>{};
@@ -52,9 +52,9 @@ U128 do_cksum_vmull(std::uint32_t crc, const U128* buf, std::size_t num)
   for ( ; num >= 2; --num)
     data0 = ClMulDiag(data0, SingleK) ^ Load(*++buf);
   return Unload(data0);
-} // do_cksum_vmull
+} // do_cksum_simd
 
-std::uint32_t cksum_vmull(std::uint32_t crc, const void* buf, std::size_t size)
+std::uint32_t cksum_simd(std::uint32_t crc, const void* buf, std::size_t size)
   noexcept
 {
   auto n = size / sizeof(U128);
@@ -65,8 +65,8 @@ std::uint32_t cksum_vmull(std::uint32_t crc, const void* buf, std::size_t size)
     return std::byteswap(crc);
   }
   auto p = reinterpret_cast<const U128*>(buf);
-  auto u = do_cksum_vmull(crc, p, n);
+  auto u = do_cksum_simd(crc, p, n);
   crc = CrcUpdate(0, &u, sizeof(u));
   crc = CrcUpdate(crc, p+n, r);
   return std::byteswap(crc);
-} // cksum_vmull
+} // cksum_simd

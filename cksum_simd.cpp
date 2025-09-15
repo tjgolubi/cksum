@@ -13,12 +13,8 @@ using U128 = tjg::Int<uint128_t, std::endian::big>;
 U128 do_cksum_simd(std::uint32_t crc, const U128* buf, std::size_t num)
   noexcept
 {
-  (void) tjg::VerifyInt<std::uint64_t>{};
-  (void) tjg::VerifyInt<uint128_t>{};
-
   using Vec = simd::Simd<simd::uint64x2_t>;
   using C = tjg::crc::CrcConsts<32, 0x04c11db7>;
-  using simd::ClMulDiag;
 
   static const auto SingleK = Vec{C::K128_lo, C::K128_hi};
   static const auto FourK   = Vec{C::K512_lo, C::K512_hi};
@@ -26,9 +22,8 @@ U128 do_cksum_simd(std::uint32_t crc, const U128* buf, std::size_t num)
   auto Load   = [](U128 x) -> Vec  { return  Vec{x}; };
   auto Unload = [](Vec  x) -> U128 { return U128{x}; };
 
-  auto data0 = Load(buf[0]);
-
-  data0 ^= Vec{uint128_t{crc} << (128-32)};
+  auto data0 = Vec{uint128_t{crc} << (128-32)};
+  data0 ^= Load(buf[0]);
 
   if (num >= 8) {
     auto data1 = Load(buf[1]);

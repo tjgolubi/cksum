@@ -51,10 +51,10 @@ concept VectorType =
           boost::mp11::mp_contains<VectorTypes, std::remove_cvref_t<V>>::value;
 
 template<VectorType V> struct ScalarType;
-template<> struct ScalarType<uint8x16_t> { using type = std::uint8_t ;  };
-template<> struct ScalarType<uint16x8_t> { using type = std::uint16_t;  };
-template<> struct ScalarType<uint32x4_t> { using type = std::uint32_t;  };
-template<> struct ScalarType<uint64x2_t> { using type = std::uint64_t;  };
+template<> struct ScalarType<uint8x16_t> { using type = std::uint8_t ; };
+template<> struct ScalarType<uint16x8_t> { using type = std::uint16_t; };
+template<> struct ScalarType<uint32x4_t> { using type = std::uint32_t; };
+template<> struct ScalarType<uint64x2_t> { using type = std::uint64_t; };
 template<VectorType V> using ScalarT = ScalarType<V>::type;
 
 template<VectorType V>
@@ -83,16 +83,6 @@ constexpr V ByteSwap(V v) noexcept {
   return std::bit_cast<V>(b);
 } // ByteSwap
 
-#if defined(SIMD_SSE)
-
-constexpr uint8x16_t Reverse(uint8x16_t v) noexcept {
-  static const auto K = _mm_set_epi8(
-                          0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
-  return (uint8x16_t) _mm_shuffle_epi8((__m128i) v, K);
-}
-
-#else
-
 constexpr uint8x16_t Reverse(uint8x16_t v) noexcept {
   return __builtin_shufflevector(v, v, 15, 14, 13, 12, 11, 10, 9, 8,
                                         7,  6,  5,  4,  3,  2, 1, 0);
@@ -106,8 +96,6 @@ constexpr uint32x4_t Reverse(uint32x4_t v) noexcept
 
 constexpr uint64x2_t Reverse(uint64x2_t v) noexcept
   { return __builtin_shufflevector(v, v, 1, 0); }
-
-#endif
 
 template<VectorType V>
 constexpr V FullSwap(V v) noexcept {
@@ -126,13 +114,13 @@ constexpr uint128_t clmul(std::uint64_t x, std::uint64_t y) noexcept {
 #endif
 } // clmul
 
-constexpr uint64x2_t ClMulDiag(const uint64x2_t& x, const uint64x2_t& y)
+constexpr uint64x2_t ClMulDiag(uint64x2_t x, uint64x2_t y)
   noexcept
 {
 #if defined(SIMD_SSE)
   auto t1 = _mm_clmulepi64_si128((__m128i) x, (__m128i) y, 0x00);
   auto t2 = _mm_clmulepi64_si128((__m128i) x, (__m128i) y, 0x11);
-  return (uint64x2_t) (t1 ^ t2);
+  return std::bit_cast<uint64x2_t>(t1 ^ t2);
 #else
   auto z = clmul(x[0], y[0]) ^ clmul(x[1], y[1]);
   return std::bit_cast<uint64x2_t>(z);
@@ -190,6 +178,10 @@ public:
   constexpr explicit Simd(register_type value_) noexcept : r{value_} { }
   constexpr explicit Simd(full_type v) noexcept { set(v); }
 
+  template<std::integral T, std::endian E>
+  requires tjg::NonNarrowing<T, full_type>
+  constexpr explicit Simd(tjg::Int<T, E> x) noexcept { set(x); }
+
 private:
   //----------------------------------------------------------
   // _set span of values
@@ -202,7 +194,7 @@ private:
   }
 
   //----------------------------------------------------------
-  // _set span of tjg::Int's
+  // _setInt span of tjg::Int's
   //----------------------------------------------------------
   template<std::integral T, std::endian E>
   constexpr void _setInt(std::span<const tjg::Int<T, E>, Lanes> values) noexcept

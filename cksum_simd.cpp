@@ -2,7 +2,7 @@
 #include "CrcConsts.hpp"
 
 #include "CrcUpdate.hpp"
-#include "Neon.hpp"
+#include "Simd.hpp"
 
 #include "Int.hpp"
 
@@ -10,31 +10,30 @@
 
 using U128 = tjg::Int<uint128_t, std::endian::big>;
 
-U128 do_cksum_vmull(std::uint32_t crc, const U128* buf, std::size_t num)
+U128 do_cksum_simd(std::uint32_t crc, const U128* buf, std::size_t num)
   noexcept
 {
   (void) tjg::VerifyInt<std::uint64_t>{};
   (void) tjg::VerifyInt<uint128_t>{};
 
-  using NeonVec  = NeonV<uint64x2_t>;
-  using NeonPoly = NeonV<poly64x2_t>;
-
+  using Vec = simd::Simd<simd::uint64x2_t>;
   using C = tjg::crc::CrcConsts<32, 0x04c11db7>;
+  using simd::ClMulDiag;
 
-  static const NeonPoly SingleK{C::K128_lo, C::K128_hi};
-  static const NeonPoly FourK  {C::K512_lo, C::K512_hi};
+  static const auto SingleK = Vec{C::K128_lo, C::K128_hi};
+  static const auto FourK   = Vec{C::K512_lo, C::K512_hi};
 
-  auto Load   = [&](U128 x) -> NeonVec { return NeonVec{x}; };
-  auto Unload = [&](NeonVec x) -> U128 { return U128{x}; };
+  auto Load   = [](U128 x) -> Vec  { return  Vec{x}; };
+  auto Unload = [](Vec  x) -> U128 { return U128{x}; };
 
-  NeonVec data0 = Load(buf[0]);
+  auto data0 = Load(buf[0]);
 
-  data0 ^= NeonVec{uint128_t{crc} << (128-32)};
+  data0 ^= Vec{uint128_t{crc} << (128-32)};
 
   if (num >= 8) {
-    NeonVec data1 = Load(buf[1]);
-    NeonVec data2 = Load(buf[2]);
-    NeonVec data3 = Load(buf[3]);
+    auto data1 = Load(buf[1]);
+    auto data2 = Load(buf[2]);
+    auto data3 = Load(buf[3]);
 
     for ( ; num >= 8; num -= 4) {
       buf += 4;
@@ -53,9 +52,9 @@ U128 do_cksum_vmull(std::uint32_t crc, const U128* buf, std::size_t num)
   for ( ; num >= 2; --num)
     data0 = ClMulDiag(data0, SingleK) ^ Load(*++buf);
   return Unload(data0);
-} // do_cksum_vmull
+} // do_cksum_simd
 
-std::uint32_t cksum_vmull(std::uint32_t crc, const void* buf, size_t size)
+std::uint32_t cksum_simd(std::uint32_t crc, const void* buf, std::size_t size)
   noexcept
 {
   auto n = size / sizeof(U128);
@@ -66,8 +65,8 @@ std::uint32_t cksum_vmull(std::uint32_t crc, const void* buf, size_t size)
     return std::byteswap(crc);
   }
   auto p = reinterpret_cast<const U128*>(buf);
-  auto u = do_cksum_vmull(crc, p, n);
+  auto u = do_cksum_simd(crc, p, n);
   crc = CrcUpdate(0, &u, sizeof(u));
   crc = CrcUpdate(crc, p+n, r);
   return std::byteswap(crc);
-} // cksum_vmull
+} // cksum_simd

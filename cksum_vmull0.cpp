@@ -82,19 +82,14 @@ uint128_t do_cksum_vmull0(std::uint32_t crc, const uint128_t* buf, std::size_t n
   return Unload(d0);
 } // do_cksum_vmull0
 
-std::uint32_t cksum_vmull0(std::uint32_t crc, const void* buf, std::size_t size)
-  noexcept
-{
+CrcType cksum_vmull0(CrcType crc, const void* buf, std::size_t size) noexcept {
   auto n = size / sizeof(uint128_t);
   auto r = size % sizeof(uint128_t);
-  if (n < 2) {
-    crc = std::byteswap(crc);
-    crc = CrcUpdate(crc, buf, size);
-    return std::byteswap(crc);
-  }
+  if (n < 2)
+    return CrcUpdate(crc, buf, size);
   auto p = reinterpret_cast<const uint128_t*>(buf);
   auto u = do_cksum_vmull0(crc, p, n);
-  crc = CrcUpdate(0, &u, sizeof(u));
+  crc = CrcUpdate(CrcType{0}, &u, sizeof(u));
   crc = CrcUpdate(crc, p+n, r);
-  return std::byteswap(crc);
+  return crc;
 } // cksum_vmull0

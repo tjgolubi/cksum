@@ -10,8 +10,7 @@
 
 using U128 = tjg::Int<uint128_t, std::endian::big>;
 
-U128 do_cksum_simd(std::uint32_t crc, const U128* buf, std::size_t num)
-  noexcept
+U128 do_cksum_simd(std::uint32_t crc, const U128* buf, std::size_t num) noexcept
 {
   using Vec = simd::Simd<simd::uint64x2_t>;
   using C = tjg::crc::CrcConsts<32, 0x04c11db7>;
@@ -49,19 +48,14 @@ U128 do_cksum_simd(std::uint32_t crc, const U128* buf, std::size_t num)
   return Unload(data0);
 } // do_cksum_simd
 
-std::uint32_t cksum_simd(std::uint32_t crc, const void* buf, std::size_t size)
-  noexcept
-{
+CrcType cksum_simd(CrcType crc, const void* buf, std::size_t size) noexcept {
   auto n = size / sizeof(U128);
   auto r = size % sizeof(U128);
-  if (n < 2) {
-    crc = std::byteswap(crc);
-    crc = CrcUpdate(crc, buf, size);
-    return std::byteswap(crc);
-  }
+  if (n < 2)
+    return CrcUpdate(crc, buf, size);
   auto p = reinterpret_cast<const U128*>(buf);
   auto u = do_cksum_simd(crc, p, n);
-  crc = CrcUpdate(0, &u, sizeof(u));
+  crc = CrcUpdate(CrcType{0}, &u, sizeof(u));
   crc = CrcUpdate(crc, p+n, r);
-  return std::byteswap(crc);
+  return crc;
 } // cksum_simd

@@ -28,8 +28,6 @@ template<std::unsigned_integral U>
 auto Value(U x) -> typename CoutType<U>::type
   { return static_cast<typename CoutType<U>::type>(x); }
 
-using CrcType = std::uint32_t;
-
 using CrcFn = CrcType (*)(CrcType crc, const void* buf, std::size_t size);
 
 auto ExpectedCrc = CrcType{0x3e906f85};

@@ -10,8 +10,7 @@
 /* Number of bytes to read at once.  */
 constexpr std::size_t BufLen = 1 << 16;
 
-using cksum_fp_t =
-            std::uint32_t (*)(std::uint32_t, const void* buf, std::size_t size);
+using cksum_fp_t = CrcType (*)(CrcType crc, const void* buf, std::size_t size);
 
 static cksum_fp_t pclmul_supported(void) {
 #if USE_PCLMUL_CRC32
@@ -45,10 +44,14 @@ static cksum_fp_t vmull_supported(void) {
   return nullptr;
 } // vmull_supported
 
+CrcType cksum_update(CrcType crc, const void* buf, std::size_t size) noexcept {
+  return CrcUpdate(crc, buf, size);
+}
+
 /* Calculate the checksum and length in bytes of stream STREAM.
    Return false on error, true on success.  */
 
-std::uint32_t CrcSumStream(std::ifstream& stream, std::streamsize* length) {
+CrcType CrcSumStream(std::ifstream& stream, std::streamsize* length) {
   static cksum_fp_t cksum_fp;
   if (!cksum_fp)
     cksum_fp = pclmul_supported();
@@ -57,7 +60,7 @@ std::uint32_t CrcSumStream(std::ifstream& stream, std::streamsize* length) {
   if (!cksum_fp)
     cksum_fp = cksum_slice8;
 
-  auto crc = std::uint32_t{0};
+  auto crc = CrcType{0};
   auto total_bytes = std::streamsize{0};
   using uint128_t = unsigned __int128;
   auto buf = std::array<uint128_t, BufLen/sizeof(uint128_t)>{};
@@ -79,8 +82,7 @@ std::uint32_t CrcSumStream(std::ifstream& stream, std::streamsize* length) {
   if (length)
     *length = total_bytes;
 
-  crc = std::byteswap(crc);
   for ( ; total_bytes; total_bytes >>= 8)
     crc = CrcUpdate(crc, std::byte(total_bytes));
-  return ~std::byteswap(crc);
+  return ~crc;
 } // CrcSumStream

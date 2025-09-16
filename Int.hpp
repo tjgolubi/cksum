@@ -140,7 +140,18 @@ public:
   [[nodiscard]] constexpr T little() const noexcept
     { return _get<std::endian::little>(); }
 
+  // Return the value in native-endian byte order.
+  [[nodiscard]]
   constexpr operator T() const noexcept { return value(); }
+
+  // Return the least-significant-byte.
+  [[nodiscard]]
+  explicit constexpr operator std::byte() const noexcept {
+    if constexpr (Endian == std::endian::native)
+      return std::byte(_raw);
+    else
+      return std::byte(_raw >> (8 * (sizeof(T)-1)));
+  }
   /// @}
 
   /// @name Comparison
@@ -216,6 +227,20 @@ public:
 
   constexpr Int& operator>>=(std::integral auto rhs) noexcept
     { return *this = static_cast<T>(value() >> rhs); }
+
+  constexpr Int leftBytes(std::integral auto shift) const noexcept {
+    if (Endian == std::endian::native)
+      return Int::Raw(_raw << (8 * shift));
+    else
+      return Int::Raw(_raw >> (8 * shift));
+  } // leftBytes
+
+  constexpr Int rightBytes(std::integral auto shift) const noexcept {
+    if (Endian == std::endian::native)
+      return Int::Raw(_raw >> (8 * shift));
+    else
+      return Int::Raw(_raw << (8 * shift));
+  } // rightBytes
 
   constexpr Int& operator +=(Int rhs) noexcept { return *this  += T{rhs}; }
   constexpr Int& operator -=(Int rhs) noexcept { return *this  -= T{rhs}; }

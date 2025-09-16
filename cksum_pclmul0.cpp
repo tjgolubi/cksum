@@ -11,10 +11,7 @@ using uint128_t = unsigned __int128;
 
 using U128 = uint128_t;
 
-U128 do_cksum_pclmul0(std::uint32_t crc, const U128* buf, size_t num)
-  noexcept
-{
-
+U128 do_cksum_pclmul0(std::uint32_t crc, const U128* buf, size_t num) noexcept {
   const __m128i SingleK = _mm_set_epi64x(0xc5b9cd4c, 0xe8a45605);
   const __m128i FourK   = _mm_set_epi64x(0x8833794c, 0xe6228b11);
 
@@ -102,18 +99,14 @@ U128 do_cksum_pclmul0(std::uint32_t crc, const U128* buf, size_t num)
   return (U128) data0;
 } // do_cksum_pclmul0
 
-std::uint32_t
-cksum_pclmul0(std::uint32_t crc, const void* buf, std::size_t size) noexcept {
+CrcType cksum_pclmul0(CrcType crc, const void* buf, std::size_t size) noexcept {
   auto n = size / sizeof(U128);
   auto r = size % sizeof(U128);
-  if (n < 2) {
-    crc = std::byteswap(crc);
-    crc = CrcUpdate(crc, buf, size);
-    return std::byteswap(crc);
-  }
+  if (n < 2)
+    return CrcUpdate(crc, buf, size);
   auto p = reinterpret_cast<const U128*>(buf);
   auto u = do_cksum_pclmul0(crc, p, n);
-  crc = CrcUpdate(0, &u, sizeof(u));
+  crc = CrcUpdate(CrcType{0}, &u, sizeof(u));
   crc = CrcUpdate(crc, p+n,r);
-  return std::byteswap(crc);
+  return crc;
 } // cksum_pclmul0

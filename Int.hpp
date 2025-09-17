@@ -71,20 +71,37 @@ private:
       _raw = std::byteswap(x);
   }
 
+  template<std::integral U> requires NonNarrowing<U, T>
+  constexpr void _set(Int<U, Endian> x) noexcept {
+    if constexpr (Endian == std::endian::native)
+      _raw = T{x._raw};
+    else
+      _raw = T{x._raw} << (8 * (sizeof(T) - sizeof(U)));
+  }
+
+  template<std::integral U> requires NonNarrowing<U, T>
+  constexpr void _set(Int<U, ~Endian> x) noexcept { _set(T{U{x}}); }
+
 public:
   /// @name Constructors
   /// @{
   constexpr Int() noexcept = default;
   constexpr Int(const Int&) noexcept = default;
+  constexpr Int(Int<T, ~E> x) noexcept { _set(T{x}); }
+
+  /// Construct from the a wider Int.
+  template<std::integral U, std::endian E2>
+    requires (!std::same_as<U, T> && NonNarrowing<U, T>)
+  constexpr Int(Int<U, E2> x) noexcept { _set(x); }
 
   /// Construct from the underlying type. The value is stored using endianness E.
   /// construction is explicit to avoid surprises in mixed expressions.
   constexpr explicit Int(T x) noexcept { _set(x); }
-  /// @}
 
   // Construct from raw storage.
   static constexpr Int Raw(T x) noexcept
     { Int rval; rval._raw = x; return rval; }
+  /// @}
 
   /// @name Assignment
   /// @{
@@ -96,8 +113,7 @@ public:
 
   /// Assign from another Int<U, E2> without narrowing.
   template<std::integral U, std::endian E2> requires NonNarrowing<U, T>
-  constexpr Int& operator=(Int<U, E2> x) noexcept
-    { _set(T{U{x}}); return *this; }
+  constexpr Int& operator=(Int<U, E2> x) noexcept { _set(x); return *this; }
   /// @}
 
 private:
@@ -337,8 +353,8 @@ requires std::same_as<ToT, FmT>
 constexpr Int<ToT, E> narrow_cast(Int<FmT, E> x) noexcept
   { return x; }
 
-/// Return a value with the opposite endianness by byte-swapping the underlying
-/// bits.
+/// Return the same value with the opposite endianness by byte-swapping the
+/// underlying bits.
 /// @tparam T underlying integral type
 /// @tparam E current endianness
 /// @param x value to flip
@@ -346,6 +362,15 @@ constexpr Int<ToT, E> narrow_cast(Int<FmT, E> x) noexcept
 template<std::integral T, std::endian E>
 constexpr Int<T, ~E> byteswap(Int<T, E> x) noexcept
   { return Int<T, ~E>{x}; }
+
+/// Returns number of 1's in the value.
+template<std::integral T, std::endian E>
+constexpr int popcount(Int<T, E> x) noexcept { return std::popcount(x.raw()); }
+
+/// Returns `true` if the value is an integral power of 2.
+template<std::integral T, std::endian E>
+constexpr bool has_single_bit(Int<T, E> x) noexcept
+  { return std::has_single_bit(x.raw()); }
 
 /// Alias for big-endian signed Int with underlying type T.
 template<std::signed_integral   T=int>
@@ -370,7 +395,6 @@ using BigUint8   = BigUint<std::uint8_t>;
 using BigUint16  = BigUint<std::uint16_t>;
 using BigUint32  = BigUint<std::uint32_t>;
 using BigUint64  = BigUint<std::uint64_t>;
-
 
 /// Alias for little-endian unsigned Int with underlying type T.
 template<std::unsigned_integral T=unsigned>

@@ -12,19 +12,18 @@ using simd::uint128_t;
 
 using U128 = tjg::Int<uint128_t, std::endian::big>;
 
-U128 do_cksum_simd(std::uint32_t crc, const U128* buf, std::size_t num) noexcept
+uint128_t do_cksum_simd(uint128_t init, const U128* buf, std::size_t num)
+  noexcept
 {
   using Vec = simd::Simd<simd::uint64x2_t>;
-  using C = tjg::crc::CrcConsts<32, 0x04c11db7>;
+  using C = tjg::crc::Crc32Consts;
 
   static const auto SingleK = Vec{C::K128_lo, C::K128_hi};
   static const auto FourK   = Vec{C::K512_lo, C::K512_hi};
 
   auto Load   = [](U128 x) -> Vec  { return  Vec{x}; };
-  auto Unload = [](Vec  x) -> U128 { return U128{x}; };
 
-  auto data0 = Vec{uint128_t{crc} << (128-32)};
-  data0 ^= Load(buf[0]);
+  auto data0 = Vec{init} ^ Load(buf[0]);
 
   if (num >= 8) {
     auto data1 = Load(buf[1]);
@@ -47,7 +46,7 @@ U128 do_cksum_simd(std::uint32_t crc, const U128* buf, std::size_t num) noexcept
   }
   for ( ; num >= 2; --num)
     data0 = ClMulDiag(data0, SingleK) ^ Load(*++buf);
-  return Unload(data0);
+  return uint128_t{data0};
 } // do_cksum_simd
 
 CrcType cksum_simd(CrcType crc, const void* buf, std::size_t size) noexcept {
@@ -56,8 +55,10 @@ CrcType cksum_simd(CrcType crc, const void* buf, std::size_t size) noexcept {
   if (n < 2)
     return CrcUpdate(crc, buf, size);
   auto p = reinterpret_cast<const U128*>(buf);
-  auto u = do_cksum_simd(crc, p, n);
-  crc = CrcUpdate(CrcType{0}, &u, sizeof(u));
+  auto u = do_cksum_simd(uint128_t{crc} << (128-32), p, n);
+  crc = CrcType{0};
+  for (std::size_t i = 0; i != sizeof(u); ++i)
+    crc = CrcUpdate(crc, std::byte(u >> 8*((sizeof(u)-1)-i)));
   crc = CrcUpdate(crc, p+n, r);
   return crc;
 } // cksum_simd

@@ -1,4 +1,6 @@
 #pragma once
+#include "Int.hpp"
+#include "../tjg32/tjg/Integer.hpp"
 #include <bit>
 #include <type_traits>
 #include <cstdint>
@@ -12,13 +14,14 @@ public:
   static constexpr int Bits = _Bits_;
   static constexpr std::uint64_t Poly = _PolyNoTop_;
 
-private:
-  static constexpr std::uint64_t Mask =
-          (Bits == 64) ? ~std::uint64_t{0} : (std::uint64_t{1} << Bits) - 1;
+  using CrcType = Int<typename uint_t<Bits>::least, std::endian::big>;
+
+  static constexpr std::uint64_t Mask = ~std::uint64_t{0} >> (64-Bits);
   static_assert(((Poly & ~Mask) == 0), "Polynomial out of range");
 
+private:
   template<int Exp>
-  static constexpr std::uint64_t XpowMod() {
+  static constexpr std::uint64_t XpowMod() noexcept {
     if constexpr (Exp < Bits) {
       return std::uint64_t{1} << Exp;
     } else {
@@ -33,7 +36,7 @@ private:
     }
   } // XpowMod
 
-  static constexpr std::uint64_t ComputeMu() {
+  static constexpr std::uint64_t ComputeMu() noexcept {
     using uint128_t = unsigned __int128;
     constexpr uint128_t P = (uint128_t{1} << Bits) | uint128_t{Poly};
     constexpr uint128_t X2n =
@@ -58,7 +61,9 @@ public:
   static constexpr std::uint64_t K128_hi = XpowMod<1*128 + 64>();
   static constexpr std::uint64_t K512_lo = XpowMod<4*128>();
   static constexpr std::uint64_t K512_hi = XpowMod<4*128 + 64>();
-  static constexpr std::uint64_t MU_2N  = ComputeMu();
+  static constexpr std::uint64_t Mu2N    = ComputeMu();
 }; // CrcConsts
+
+using Crc32Consts = CrcConsts<32, 0x04c11db7>;
 
 } // tjg::crc

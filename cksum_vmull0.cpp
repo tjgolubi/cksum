@@ -1,10 +1,8 @@
 #include "cksum.hpp"
-
 #include "CrcUpdate.hpp"
-
 #include <bit>
-
 #include <arm_neon.h>
+#include <cstdint>
 
 using uint128_t = unsigned __int128;
 

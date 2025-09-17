@@ -40,7 +40,7 @@ bool TestCrc(CrcFn fn, const std::string name, std::span<const std::byte> data)
   using namespace std::chrono;
   // cout << "Running " << left << setw(8) << name << right << "... ";
   auto start = Clock::now();
-  auto crc = CrcType{};
+  auto crc = CrcType{0};
   for (int i = 0; i != LoopCount; ++i)
     crc = fn(crc, data.data(), data.size());
   auto stop = Clock::now();
@@ -52,7 +52,7 @@ bool TestCrc(CrcFn fn, const std::string name, std::span<const std::byte> data)
   cout << hex << setfill('0') << " 0x" << setw(8) << crc
     << dec << setfill(' ') << fixed << setprecision(0)
     << ' ' << setw(8) << rate << "MiB/s";
-  if (ExpectedCrc == CrcType{})
+  if (ExpectedCrc == CrcType{0})
     ExpectedCrc = crc;
   if (crc != ExpectedCrc)
     cout << " FAIL";

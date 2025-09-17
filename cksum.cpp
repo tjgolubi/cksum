@@ -59,6 +59,7 @@ CrcType CrcSumStream(std::ifstream& stream, std::streamsize* length) {
     cksum_fp = vmull_supported();
   if (!cksum_fp)
     cksum_fp = cksum_slice8;
+  cksum_fp = cksum_slice8;
 
   auto crc = CrcType{0};
   auto total_bytes = std::streamsize{0};

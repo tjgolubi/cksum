@@ -14,8 +14,6 @@ public:
   static constexpr int Bits = _Bits_;
   static constexpr std::uint64_t Poly = _PolyNoTop_;
 
-  using CrcType = Int<typename uint_t<Bits>::least, std::endian::big>;
-
   static constexpr std::uint64_t Mask = ~std::uint64_t{0} >> (64-Bits);
   static_assert(((Poly & ~Mask) == 0), "Polynomial out of range");
 

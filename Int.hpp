@@ -72,27 +72,36 @@ private:
   }
 
   template<std::integral U> requires NonNarrowing<U, T>
-  constexpr void _set(Int<U, Endian> x) noexcept {
+  constexpr void _setInt(Int<U, Endian> x) noexcept {
     if constexpr (Endian == std::endian::native)
       _raw = T{x.raw()};
     else
       _raw = T{x.raw()} << (8 * (sizeof(T) - sizeof(U)));
   }
 
-  template<std::integral U> requires NonNarrowing<U, T>
-  constexpr void _set(Int<U, ~Endian> x) noexcept { _set(T{U{x}}); }
+  template<std::integral U> requires (!NonNarrowing<U, T>)
+  constexpr void _setInt(Int<U, Endian> x) noexcept {
+    if constexpr (Endian == std::endian::native)
+      _raw = static_cast<T>(x.raw());
+    else
+      _raw = static_cast<T>(x.raw() >> (8 * (sizeof(U) - sizeof(T))));
+  }
+
+  template<std::integral U>
+  constexpr void _setInt(Int<U, ~Endian> x) noexcept
+    { _set(static_cast<T>(U{x})); }
 
 public:
   /// @name Constructors
   /// @{
   constexpr Int() noexcept = default;
   constexpr Int(const Int&) noexcept = default;
-  constexpr Int(Int<T, ~E> x) noexcept { _set(T{x}); }
+  explicit constexpr Int(Int<T, ~Endian> x) noexcept { _set(T{x}); }
 
-  /// Construct from the a wider Int.
-  template<std::integral U, std::endian E2>
-    requires (!std::same_as<U, T> && NonNarrowing<U, T>)
-  constexpr Int(Int<U, E2> x) noexcept { _set(x); }
+  /// Converting ctor, explicit if changes endian or narrowing.
+  template<std::integral U, std::endian E2> requires (!std::same_as<U, T>)
+  explicit(E2 != Endian || !NonNarrowing<U, T>)
+  constexpr Int(Int<U, E2> x) noexcept { _setInt(x); }
 
   /// Construct from the underlying type. The value is stored using endianness E.
   /// construction is explicit to avoid surprises in mixed expressions.

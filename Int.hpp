@@ -74,9 +74,9 @@ private:
   template<std::integral U> requires NonNarrowing<U, T>
   constexpr void _set(Int<U, Endian> x) noexcept {
     if constexpr (Endian == std::endian::native)
-      _raw = T{x._raw};
+      _raw = T{x.raw()};
     else
-      _raw = T{x._raw} << (8 * (sizeof(T) - sizeof(U)));
+      _raw = T{x.raw()} << (8 * (sizeof(T) - sizeof(U)));
   }
 
   template<std::integral U> requires NonNarrowing<U, T>

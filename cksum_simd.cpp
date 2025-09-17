@@ -8,6 +8,8 @@
 
 #include <bit>
 
+using simd::uint128_t;
+
 using U128 = tjg::Int<uint128_t, std::endian::big>;
 
 U128 do_cksum_simd(std::uint32_t crc, const U128* buf, std::size_t num) noexcept

@@ -14,29 +14,43 @@
 #include <utility>
 #include <bit>
 
-#if __has_include(<arm_neon.h>)
-#include <arm_neon.h>
-#define SIMD_NEON 1
-#elif __has_include(<immintrin.h>)
-#include <immintrin.h>
-#define SIMD_SSE 1
-#else
-#include "../ClMul/ClMul.hpp"
+#undef TJG_SIMD_BUILTIN
+#define TJG_SIMD_NEON  1
+#define TJG_SIMD_SSE   2
+
+// x86 PCLMUL
+#if (defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64))
+  #if defined(__PCLMUL__) || defined(__PCLMULQDQ__)
+    #define TJG_SIMD_BUILTIN TJG_SIMD_SSE
+    #include <immintrin.h>
+  #endif
+#endif
+
+// ARM/AArch64 PMULL (Crypto extension)
+#if defined(__aarch64__) || defined(__arm__)
+  #if defined(__ARM_FEATURE_CRYPTO)
+    #define TJG_SIMD_BUILTIN TJG_SIMD_NEON
+    #include <arm_neon.h>
+  #endif
+#endif
+
+#ifndef TJG_SIMD_BUILTIN
+#error "No SIMD support detected."
 #endif
 
 #include <iostream>
 #include <iomanip>
 
-using uint128_t = unsigned __int128;
-
 namespace simd {
 
-#if defined(SIMD_NEON)
+using uint128_t = unsigned __int128;
+
+#if TJG_SIMD_BUILTIN == TJG_SIMD_NEON
 using uint8x16_t = [[clang::neon_vector_type(16)]] std::uint8_t;
 using uint16x8_t = [[clang::neon_vector_type( 8)]] std::uint16_t;
 using uint32x4_t = [[clang::neon_vector_type( 4)]] std::uint32_t;
 using uint64x2_t = [[clang::neon_vector_type( 2)]] std::uint64_t;
-#else
+#elif TJG_SIMD_BUILTIN == TJG_SIMD_SSE
 template<std::unsigned_integral T>
 using VectorT [[gnu::vector_size(16)]] = T;
 using uint8x16_t = VectorT<std::uint8_t >;
@@ -105,21 +119,21 @@ constexpr V FullSwap(V v) noexcept {
 } // FullSwap
 
 constexpr uint128_t clmul(std::uint64_t x, std::uint64_t y) noexcept {
-#if defined(SIMD_NEON)
+#if TJG_SIMD_BUILTIN == TJG_SIMD_NEON
   return __builtin_neon_vmull_p64(x, y);
-#elif defined(SIMD_SSE)
+#elif TJG_SIMD_BUILTIN == TJG_SIMD_SSE
   auto vx = _mm_set_epi64x(x, y);
   auto vz = _mm_clmulepi64_si128(vx, vx, 0x01);
   return std::bit_cast<uint128_t>(vz);
 #else
-  return tjg::ClMul(x, y);
+#error "No clmul support detected."
 #endif
 } // clmul
 
 constexpr uint64x2_t ClMulDiag(uint64x2_t x, uint64x2_t y)
   noexcept
 {
-#if defined(SIMD_SSE)
+#if TJG_SIMD_BUILTIN == TJG_SIMD_SSE
   auto t1 = _mm_clmulepi64_si128((__m128i) x, (__m128i) y, 0x00);
   auto t2 = _mm_clmulepi64_si128((__m128i) x, (__m128i) y, 0x11);
   return std::bit_cast<uint64x2_t>(t1 ^ t2);

@@ -48,6 +48,15 @@ CrcType cksum_update(CrcType crc, const void* buf, std::size_t size) noexcept {
   return CrcUpdate(crc, buf, size);
 }
 
+CrcType cksum_update(CrcType crc, GetBufferCb cb) noexcept {
+  auto buf = cb();
+  while (!buf.empty()) {
+    crc = CrcUpdate(crc, buf.data(), buf.size());
+    buf = cb();
+  }
+  return crc;
+}
+
 /* Calculate the checksum and length in bytes of stream STREAM.
    Return false on error, true on success.  */
 
@@ -83,7 +92,7 @@ CrcType CrcSumStream(std::ifstream& stream, std::streamsize* length) {
     return RType{buf.data(), len};
   };
 
-  auto crc = cksum_simd(CrcType{0}, get_buffer);
+  auto crc = cksum_update(CrcType{0}, get_buffer);
 
   if (length)
     *length = total_bytes;

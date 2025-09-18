@@ -5,9 +5,10 @@ export PROJDIR := $(abspath .)
 # SWDEV := $(PROJDIR)/SwDev
 include $(SWDEV)/project.mk
 
-APP:=$(abspath $(HOME)/App)
+APP  :=$(abspath $(HOME)/App)
 BOOST:=$(APP)/boost
-MP11:=$(APP)/mp11
+MP11 :=$(APP)/mp11
+GSL  :=$(APP)/GSL
 
 # Must use "=" instead of ":=" because $E will be defined below.
 CKSUM_E=cksum.$E
@@ -34,7 +35,7 @@ endif
 SOURCE:=$(SRC1) $(SRC2) $(SRC3)
 
 #SYSINCL:=$(addsuffix /include, $(UNITS)/core $(UNITS)/systems $(GSL))
-SYSINCL:=$(BOOST) $(addsuffix /include, $(MP11))
+SYSINCL:=$(BOOST) $(addsuffix /include, $(MP11) $(GSL))
 INCLUDE:=$(PROJDIR)
 
 # Must use "=" because LIBS will be changed below.

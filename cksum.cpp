@@ -61,24 +61,29 @@ CrcType CrcSumStream(std::ifstream& stream, std::streamsize* length) {
     cksum_fp = cksum_slice8;
   cksum_fp = cksum_slice8;
 
-  auto crc = CrcType{0};
   auto total_bytes = std::streamsize{0};
+
   using uint128_t = unsigned __int128;
-  auto buf = std::array<uint128_t, BufLen/sizeof(uint128_t)>{};
+  alignas(alignof(uint128_t))
+  auto buf = std::array<std::byte, BufLen>{};
   auto cbuf = reinterpret_cast<char*>(buf.data());
 
-  stream.exceptions(std::ios::badbit);
-  do {
+  auto get_buffer = [&]() noexcept -> std::span<const std::byte> {
+    using RType = std::span<const std::byte>;
+    if (!stream)
+      return RType{};
     stream.read(cbuf, BufLen);
     auto bytes_read = stream.gcount();
     if (bytes_read == 0)
-      break;
-    if (total_bytes + bytes_read < total_bytes)
-      throw std::overflow_error{"Failure reading input stream"};
+      return RType{};
+    // if (total_bytes + bytes_read < total_bytes)
+    //   throw std::overflow_error{"Failure reading input stream"};
     total_bytes += bytes_read;
     auto len = static_cast<std::size_t>(bytes_read);
-    crc = cksum_fp(crc, buf.data(), len);
-  } while (!stream.eof());
+    return RType{buf.data(), len};
+  };
+
+  auto crc = cksum_simd(CrcType{0}, get_buffer);
 
   if (length)
     *length = total_bytes;

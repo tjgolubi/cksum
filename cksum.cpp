@@ -10,7 +10,7 @@
 /* Number of bytes to read at once.  */
 constexpr std::size_t BufLen = 1 << 16;
 
-using cksum_fp_t = CrcType (*)(CrcType crc, const void* buf, std::size_t size);
+using cksum_fp_t = CrcType (*)(CrcType crc, GetBufferCb cb);
 
 static cksum_fp_t pclmul_supported(void) {
 #if USE_PCLMUL_CRC32
@@ -68,7 +68,6 @@ CrcType CrcSumStream(std::ifstream& stream, std::streamsize* length) {
     cksum_fp = vmull_supported();
   if (!cksum_fp)
     cksum_fp = cksum_slice8;
-  cksum_fp = cksum_slice8;
 
   auto total_bytes = std::streamsize{0};
 
@@ -92,7 +91,7 @@ CrcType CrcSumStream(std::ifstream& stream, std::streamsize* length) {
     return RType{buf.data(), len};
   };
 
-  auto crc = cksum_update(CrcType{0}, get_buffer);
+  auto crc = cksum_fp(CrcType{0}, get_buffer);
 
   if (length)
     *length = total_bytes;

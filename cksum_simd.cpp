@@ -6,6 +6,8 @@
 
 #include "Int.hpp"
 
+#include <gsl/gsl>
+
 #include <bit>
 
 using simd::uint128_t;
@@ -54,7 +56,20 @@ CrcType cksum_simd(CrcType crc, const void* buf, std::size_t size) noexcept {
   auto r = size % sizeof(U128);
   if (n < 2)
     return CrcUpdate(crc, buf, size);
-  auto p = reinterpret_cast<const U128*>(buf);
+  auto cp = reinterpret_cast<const std::byte*>(buf);
+  { // Process unaligned head.
+    auto head = reinterpret_cast<std::uintptr_t>(buf) % sizeof(std::uint64_t);
+    if (head != 0) {
+      head = sizeof(std::uint64_t) - head;
+      crc = CrcUpdate(crc, cp, head);
+      cp   += head;
+      size -= head;
+      n = size / sizeof(U128);
+      r = size % sizeof(U128);
+    }
+  }
+  auto ap = std::assume_aligned<sizeof(U128)>(cp);
+  auto p = reinterpret_cast<const U128*>(ap);
   auto u = do_cksum_simd(uint128_t{crc} << (128-32), p, n);
   crc = CrcType{0};
   for (std::size_t i = 0; i != sizeof(u); ++i)
@@ -64,28 +79,30 @@ CrcType cksum_simd(CrcType crc, const void* buf, std::size_t size) noexcept {
 } // cksum_simd
 
 CrcType cksum_simd(CrcType crc, GetBufferCb cb) noexcept {
+  constexpr auto MinSize = 2 * sizeof(uint128_t);
   auto buf = cb();
-  if (buf.empty())
-    return crc;
-  if (buf.size() < 2 * sizeof(uint128_t))
+  if (buf.size() < MinSize)
     return CrcUpdate(crc, buf.data(), buf.size());
+  Expects(reinterpret_cast<std::uintptr_t>(buf.data()) % sizeof(uint128_t) == 0);
   auto state = uint128_t{crc} << (128-32);
   for (;;) {
     auto n = buf.size() / sizeof(uint128_t);
     auto r = buf.size() % sizeof(uint128_t);
-    auto p = reinterpret_cast<const U128*>(buf.data());
+    auto ap = std::assume_aligned<sizeof(uint128_t)>(buf.data());
+    auto p = reinterpret_cast<const U128*>(ap);
     state = do_cksum_simd(state, p, n);
     if (r != 0) {
       buf = buf.last(r);
       break;
     }
     buf = cb();
-    if (buf.size() < 2 * sizeof(uint128_t))
+    Expects(reinterpret_cast<std::uintptr_t>(buf.data()) % sizeof(uint128_t) == 0);
+    if (buf.size() < MinSize)
       break;
     state = ClMulDiag(Vec{state}, SingleK);
   }
   crc = CrcType{0};
   for (std::size_t i = 0; i != sizeof(state); ++i)
-    crc = CrcUpdate(crc, std::byte(state >> 8*((sizeof(uint128_t)-1)-i)));
+    crc = CrcUpdate(crc, std::byte(state >> (8*((sizeof(uint128_t)-1)-i))));
   return CrcUpdate(crc, buf.data(), buf.size());
 } // cksum_simd

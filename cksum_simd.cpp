@@ -52,24 +52,22 @@ uint128_t do_cksum_simd(uint128_t init, const U128* buf, std::size_t num)
 } // do_cksum_simd
 
 CrcType cksum_simd(CrcType crc, const void* buf, std::size_t size) noexcept {
-  auto n = size / sizeof(U128);
-  auto r = size % sizeof(U128);
-  if (n < 2)
+  if (size < 2 * sizeof(U128))
     return CrcUpdate(crc, buf, size);
-  auto cp = reinterpret_cast<const std::byte*>(buf);
+  auto bp = reinterpret_cast<const std::byte*>(buf);
   { // Process unaligned head.
-    auto head = reinterpret_cast<std::uintptr_t>(buf) % sizeof(std::uint64_t);
+    auto head = reinterpret_cast<std::uintptr_t>(buf) % alignof(std::uint64_t);
     if (head != 0) {
-      head = sizeof(std::uint64_t) - head;
-      crc = CrcUpdate(crc, cp, head);
-      cp   += head;
+      head = alignof(std::uint64_t) - head;
+      crc = CrcUpdate(crc, bp, head);
+      bp   += head;
       size -= head;
-      n = size / sizeof(U128);
-      r = size % sizeof(U128);
     }
   }
-  auto ap = std::assume_aligned<sizeof(U128)>(cp);
+  auto ap = std::assume_aligned<alignof(U128)>(bp);
   auto p = reinterpret_cast<const U128*>(ap);
+  auto n = size / sizeof(U128);
+  auto r = size % sizeof(U128);
   auto u = do_cksum_simd(uint128_t{crc} << (128-32), p, n);
   crc = CrcType{0};
   for (std::size_t i = 0; i != sizeof(u); ++i)
@@ -83,7 +81,7 @@ CrcType cksum_simd(CrcType crc, GetBufferCb cb) noexcept {
   auto buf = cb();
   if (buf.size() < MinSize)
     return CrcUpdate(crc, buf.data(), buf.size());
-  Expects(reinterpret_cast<std::uintptr_t>(buf.data()) % sizeof(uint128_t) == 0);
+  Expects(reinterpret_cast<std::uintptr_t>(buf.data()) % alignof(uint128_t) == 0);
   auto state = uint128_t{crc} << (128-32);
   for (;;) {
     auto n = buf.size() / sizeof(uint128_t);
@@ -96,7 +94,7 @@ CrcType cksum_simd(CrcType crc, GetBufferCb cb) noexcept {
       break;
     }
     buf = cb();
-    Expects(reinterpret_cast<std::uintptr_t>(buf.data()) % sizeof(uint128_t) == 0);
+    Expects(reinterpret_cast<std::uintptr_t>(buf.data()) % alignof(uint128_t) == 0);
     if (buf.size() < MinSize)
       break;
     state = ClMulDiag(Vec{state}, SingleK);

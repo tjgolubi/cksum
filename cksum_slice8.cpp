@@ -14,6 +14,7 @@ inline Big32 Table(Big32 x) noexcept {
 }
 
 using BufType = tjg::Int<std::uint64_t, std::endian::big>;
+static_assert(sizeof(BufType) == sizeof(std::uint64_t));
 
 Big32 do_cksum_slice8(Big32 crc, const BufType* buf, std::size_t num)
   noexcept
@@ -36,20 +37,20 @@ Big32 do_cksum_slice8(Big32 crc, const BufType* buf, std::size_t num)
 } // do_cksum_slice8
 
 CrcType cksum_slice8(CrcType crc, const void* buf, std::size_t size) noexcept {
-  auto cp = reinterpret_cast<const std::byte*>(buf);
+  auto bp = reinterpret_cast<const std::byte*>(buf);
   { // Process unaligned head.
-    auto r = reinterpret_cast<std::uintptr_t>(buf) % sizeof(std::uint64_t);
-    if (r != 0) {
-      r = sizeof(std::uint64_t) - r;
-      crc = CrcUpdate(crc, cp, r);
-      cp   += r;
+    auto r = reinterpret_cast<std::uintptr_t>(buf) % alignof(std::uint64_t);
+    if (r != 0) [[unlikely]] {
+      r = alignof(std::uint64_t) - r;
+      crc = CrcUpdate(crc, bp, r);
+      bp   += r;
       size -= r;
     }
   }
+  auto ap = std::assume_aligned<alignof(std::uint64_t)>(bp);
+  auto p = reinterpret_cast<const BufType*>(ap);
   auto n = size / sizeof(std::uint64_t);
   auto r = size % sizeof(std::uint64_t);
-  auto ap = std::assume_aligned<sizeof(std::uint64_t)>(cp);
-  auto p = reinterpret_cast<const BufType*>(ap);
   crc = do_cksum_slice8(Big32{crc}, p, n);
   crc = CrcUpdate(crc, p+n, r);
   return crc;
@@ -59,21 +60,21 @@ CrcType cksum_slice8(CrcType crc, const void* buf, std::size_t size) noexcept {
 // Returns if size() is small or has a tail.
 CrcType cksum_slice8(CrcType crc, GetBufferCb cb) noexcept {
   auto buf = cb();
-  Expects(reinterpret_cast<std::uintptr_t>(buf.data()) % sizeof(std::uint64_t) == 0);
+  Expects(reinterpret_cast<std::uintptr_t>(buf.data()) % alignof(std::uint64_t) == 0);
   if (buf.size() >= 2 * sizeof(std::uint64_t)) [[likely]] {
     auto state = Big32{crc};
     do {
+      auto ap = std::assume_aligned<alignof(std::uint64_t)>(buf.data());
+      auto p = reinterpret_cast<const BufType*>(ap);
       auto n = buf.size() / sizeof(std::uint64_t);
       auto r = buf.size() % sizeof(std::uint64_t);
-      auto ap = std::assume_aligned<sizeof(std::uint64_t)>(buf.data());
-      auto p = reinterpret_cast<const BufType*>(ap);
       state = do_cksum_slice8(state, p, n);
       if (r != 0) {
         buf = buf.last(r);
         break;
       }
       buf = cb();
-      Expects(reinterpret_cast<std::uintptr_t>(buf.data()) % sizeof(std::uint64_t) == 0);
+      Expects(reinterpret_cast<std::uintptr_t>(buf.data()) % alignof(std::uint64_t) == 0);
     } while (buf.size() >= sizeof(std::uint64_t));
     crc = state;
   }

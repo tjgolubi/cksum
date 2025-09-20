@@ -11,6 +11,7 @@
 using simd::uint128_t;
 
 using U128 = tjg::Int<uint128_t, std::endian::big>;
+static_assert(alignof(U128) == alignof(uint128_t));
 
 uint128_t do_cksum_simd(uint128_t init, const U128* buf, std::size_t num)
   noexcept
@@ -50,15 +51,26 @@ uint128_t do_cksum_simd(uint128_t init, const U128* buf, std::size_t num)
 } // do_cksum_simd
 
 CrcType cksum_simd(CrcType crc, const void* buf, std::size_t size) noexcept {
-  auto n = size / sizeof(U128);
-  auto r = size % sizeof(U128);
-  if (n < 2)
+  if (size < 2 * sizeof(U128))
     return CrcUpdate(crc, buf, size);
-  auto p = reinterpret_cast<const U128*>(buf);
-  auto u = do_cksum_simd(uint128_t{crc} << (128-32), p, n);
+  auto bp = reinterpret_cast<const std::byte*>(buf);
+  {
+    auto head =
+        std::size_t{reinterpret_cast<std::uintptr_t>(bp) % alignof(uint128_t)};
+    if (head != 0) {
+      head  = alignof(uint128_t) - head;
+      crc   = CrcUpdate(crc, bp, head);
+      bp   += head;
+      size -= head;
+    }
+  }
+  auto ap = std::assume_aligned<alignof(uint128_t)>(bp);
+  auto p  = reinterpret_cast<const U128*>(ap);
+  auto n  = size / sizeof(U128);
+  auto r  = size % sizeof(U128);
+  auto u  = do_cksum_simd(uint128_t{crc} << (128-32), p, n);
   crc = CrcType{0};
   for (std::size_t i = 0; i != sizeof(u); ++i)
     crc = CrcUpdate(crc, std::byte(u >> 8*((sizeof(u)-1)-i)));
-  crc = CrcUpdate(crc, p+n, r);
-  return crc;
+  return CrcUpdate(crc, p+n, r);
 } // cksum_simd

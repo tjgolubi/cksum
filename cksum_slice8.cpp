@@ -35,10 +35,24 @@ CrcType do_cksum_slice8(Big32 crc, const BufType* buf, std::size_t num)
 } // do_cksum_slice8
 
 CrcType cksum_slice8(CrcType crc, const void* buf, std::size_t size) noexcept {
-  auto n = size / sizeof(std::uint64_t);
-  auto r = size % sizeof(std::uint64_t);
-  auto p = reinterpret_cast<const BufType*>(buf);
+  using std::uint64_t;
+  if (size < sizeof(uint64_t))
+    return CrcUpdate(crc, buf, size);
+  auto bp = reinterpret_cast<const std::byte*>(buf);
+  {
+    auto head =
+          std::size_t{reinterpret_cast<std::uintptr_t>(bp) % alignof(uint64_t)};
+    if (head != 0) {
+      head  = alignof(uint64_t) - head;
+      crc   = CrcUpdate(crc, bp, head);
+      bp   += head;
+      size -= head;
+    }
+  }
+  auto ap = std::assume_aligned<alignof(uint64_t)>(bp);
+  auto p  = reinterpret_cast<const BufType*>(ap);
+  auto n  = size / sizeof(uint64_t);
+  auto r  = size % sizeof(uint64_t);
   crc = do_cksum_slice8(Big32{crc}, p, n);
-  crc = CrcUpdate(crc, p+n, r);
-  return crc;
+  return CrcUpdate(crc, p+n, r);
 } // cksum_slice8

@@ -70,10 +70,8 @@ CrcType CrcSumStream(std::ifstream& stream, std::streamsize* length) {
     cksum_fp = cksum_slice8;
 
   auto total_bytes = std::streamsize{0};
-
   using uint128_t = unsigned __int128;
-  alignas(alignof(uint128_t))
-  auto buf = std::array<std::byte, BufLen>{};
+  alignas(uint128_t) auto buf = std::array<std::byte, BufLen>{};
   auto cbuf = reinterpret_cast<char*>(buf.data());
 
   auto get_buffer = [&]() noexcept -> std::span<const std::byte> {

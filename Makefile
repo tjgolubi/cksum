@@ -5,9 +5,9 @@ export PROJDIR := $(abspath .)
 # SWDEV := $(PROJDIR)/SwDev
 include $(SWDEV)/project.mk
 
-APP:=$(abspath $(HOME)/App)
+APP  :=$(abspath $(HOME)/App)
 BOOST:=$(APP)/boost
-MP11:=$(APP)/mp11
+MP11 :=$(APP)/mp11
 
 # Must use "=" instead of ":=" because $E will be defined below.
 CKSUM_E=cksum.$E

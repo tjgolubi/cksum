@@ -57,7 +57,7 @@ CrcType cksum_simd(CrcType crc, const void* buf, std::size_t size) noexcept {
   {
     auto head =
         std::size_t{reinterpret_cast<std::uintptr_t>(bp) % alignof(uint128_t)};
-    if (head != 0) {
+    if (head != 0) [[unlikely]] {
       head  = alignof(uint128_t) - head;
       crc   = CrcUpdate(crc, bp, head);
       bp   += head;

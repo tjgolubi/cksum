@@ -59,12 +59,11 @@ CrcType CrcSumStream(std::ifstream& stream, std::streamsize* length) {
     cksum_fp = vmull_supported();
   if (!cksum_fp)
     cksum_fp = cksum_slice8;
-  cksum_fp = cksum_slice8;
 
   auto crc = CrcType{0};
   auto total_bytes = std::streamsize{0};
   using uint128_t = unsigned __int128;
-  auto buf = std::array<uint128_t, BufLen/sizeof(uint128_t)>{};
+  alignas(uint128_t) auto buf = std::array<std::byte, BufLen>{};
   auto cbuf = reinterpret_cast<char*>(buf.data());
 
   stream.exceptions(std::ios::badbit);

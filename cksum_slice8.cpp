@@ -13,8 +13,9 @@ inline Big32 Table(Big32 x) noexcept {
 }
 
 using BufType = tjg::Int<std::uint64_t, std::endian::big>;
+static_assert(sizeof(BufType) == sizeof(std::uint64_t));
 
-CrcType do_cksum_slice8(Big32 crc, const BufType* buf, std::size_t num)
+Big32 do_cksum_slice8(Big32 crc, const BufType* buf, std::size_t num)
   noexcept
 {
   using std::uint8_t;
@@ -42,7 +43,7 @@ CrcType cksum_slice8(CrcType crc, const void* buf, std::size_t size) noexcept {
   {
     auto head =
           std::size_t{reinterpret_cast<std::uintptr_t>(bp) % alignof(uint64_t)};
-    if (head != 0) {
+    if (head != 0) [[unlikely]] {
       head  = alignof(uint64_t) - head;
       crc   = CrcUpdate(crc, bp, head);
       bp   += head;

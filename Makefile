@@ -1,4 +1,6 @@
-# Copyright 2025 Terry Golubiewski, all rights reserved.
+# @file
+# @copyright 2025 Terry Golubiewski, all rights reserved.
+# @author Terry Golubiewski
 
 export PROJNAME:=tjg32
 export PROJDIR := $(abspath .)
@@ -14,10 +16,10 @@ CKSUM_E=cksum.$E
 CRCTIME_E=CrcTime.$E
 MK256_E=Mk256.$E
 
-TARGET1=$(CKSUM_E)
-TARGET2=$(CRCTIME_E)
-TARGET3=$(MK256_E)
-TARGETS=$(TARGET1) $(TARGET2) $(TARGET3)
+TGT1=$(CKSUM_E)
+TGT2=$(CRCTIME_E)
+TGT3=$(MK256_E)
+TARGETS=$(TGT1) $(TGT2) $(TGT3)
 
 SRC1:=main.cpp cksum.cpp CrcTab.cpp cksum_slice8.cpp cksum_simd.cpp
 SRC2:=CrcTime.cpp cksum.cpp CrcTab.cpp cksum_slice8.cpp cksum_simd.cpp
@@ -48,6 +50,8 @@ include $(SWDEV)/build.mk
 CLEAN+=cksum_core.txt cksum_tjg.txt
 SCOUR+=bigfile.bin cksum.txt tjg.txt tjg.bin tjg256.bin
 
+SHELL:=/bin/bash
+.SHELLFLAGS:=-eu -o pipefail -c
 .ONESHELL:
 
 .PHONY: all clean scour test
@@ -83,11 +87,11 @@ test: all cksum_core.txt cksum_tjg.txt
 test2: depend $(CRCTIME_E)
 	./$(CRCTIME_E)
 
-$(TARGET1): $(OBJ1) $(LIBS)
+$(TGT1): $(OBJ1) $(LIBS)
         $(LINK)
 
-$(TARGET2): $(OBJ2) $(LIBS)
+$(TGT2): $(OBJ2) $(LIBS)
         $(LINK)
 
-$(TARGET3): $(OBJ3) $(LIBS)
+$(TGT3): $(OBJ3) $(LIBS)
         $(LINK)

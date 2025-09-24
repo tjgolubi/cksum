@@ -44,15 +44,15 @@ LIBS=
 
 #DEBUG=1
 
+SHELL:=/bin/bash
+.SHELLFLAGS:=-eu -o pipefail -c
+.ONESHELL:
+
 include $(SWDEV)/$(COMPILER).mk
 include $(SWDEV)/build.mk
 
 CLEAN+=cksum_core.txt cksum_tjg.txt
 SCOUR+=bigfile.bin cksum.txt tjg.txt tjg.bin tjg256.bin
-
-SHELL:=/bin/bash
-.SHELLFLAGS:=-eu -o pipefail -c
-.ONESHELL:
 
 .PHONY: all clean scour test
 
